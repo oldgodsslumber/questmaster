@@ -10,12 +10,21 @@ window.ViewFeed = (function () {
 
   var filter = null;   /* null = everything, 'friends', or a party code */
 
+  /* Where a new post/status/achievement should land from the Feed: the active
+   * filter if it's a postable destination, otherwise the first one (Friends). */
+  function defaultTarget() {
+    var dests = feedDestinations();
+    if (!dests.length) return null;
+    if (filter && dests.some(function (d) { return d.value === filter; })) return filter;
+    return dests[0].value;
+  }
+
   function render(host) {
     /* Buffs/debuffs + achievements are addable and visible right here on the
      * Feed too, folded into a collapsible so they don't crowd the stream. */
     if (window.ViewStatuses) {
       var statusBox = el('div');
-      ViewStatuses.panel(statusBox);
+      ViewStatuses.panel(statusBox, { postTarget: defaultTarget() });
       host.appendChild(el('details.feed-status', {},
         el('summary', {}, 'Your buffs, debuffs & achievements'), statusBox));
     }
@@ -86,7 +95,13 @@ window.ViewFeed = (function () {
         targetSel
           ? el('label.feed-target', {}, el('span.muted.small', {}, 'Post to'), targetSel)
           : el('span.muted.small', {}, 'Posting to your friends feed.'),
-        el('button.btn.primary', { onclick: send }, 'Post')));
+        el('button.btn.primary', { onclick: send }, 'Post')),
+      /* Post a buff/debuff or achievement straight to the feed — creating one
+       * here also announces it to the destination selected above. */
+      el('div.feed-quickpost', {},
+        el('span.muted.small', {}, 'Or post a:'),
+        el('button.btn.tiny.ghost', { onclick: function () { ViewStatuses.newStatus(target()); } }, '✨ Buff / Debuff'),
+        el('button.btn.tiny.ghost', { onclick: function () { ViewStatuses.newAchievement(target()); } }, '🎖️ Achievement')));
   }
 
   var KIND_ICON = { 'quest-complete': '🏆', 'achievement': '🎖️', 'status': '✨', 'journal': '📖' };

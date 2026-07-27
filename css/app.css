@@ -942,3 +942,6 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 .feed-status > summary::before { content: '▸ '; color: var(--ink-3); }
 .feed-status[open] > summary::before { content: '▾ '; }
 .feed-status[open] > summary { margin-bottom: 8px; }
+
+/* Quick-post buttons under the feed composer (buff/debuff / achievement). */
+.feed-quickpost { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }

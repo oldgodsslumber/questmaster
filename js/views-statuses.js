@@ -104,7 +104,16 @@ window.ViewStatuses = (function () {
     });
   }
 
-  function editStatus(s) {
+  /* Label a feed target ('friends' or a party code) for the "posts to X" note. */
+  function feedLabel(target) {
+    var d = feedDestinations().filter(function (x) { return x.value === target; })[0];
+    return d ? d.label : 'party';
+  }
+
+  /* editStatus(s, opts): opts.forceTarget makes a NEW status post to that feed
+   * automatically (used from the Feed) instead of offering the optional picker. */
+  function editStatus(s, opts) {
+    opts = opts || {};
     var isNew = !s;
     var name = textInput(s ? s.name : '', 'Adrenaline');
     var desc = textArea(s ? s.description : '', '', 2);
@@ -115,7 +124,10 @@ window.ViewStatuses = (function () {
     var iconCtl = Icons.iconField(iconSlug, function (v) { iconSlug = v; });
     var mods = ModEditor.create(s ? s.modifiers : [], { positiveOnly: true });
 
-    var share = isNew ? partyPostControl('Also post to a party feed') : { node: null, target: function () { return null; } };
+    var forced = isNew && opts.forceTarget ? opts.forceTarget : null;
+    var share = forced
+      ? { node: el('p.muted.small', {}, 'Posts to your ' + feedLabel(forced) + ' feed.'), target: function () { return forced; } }
+      : (isNew ? partyPostControl('Also post to a party feed') : { node: null, target: function () { return null; } });
 
     var durMode = selectInput([
       { value: 'none', label: 'Until I clear it' },
@@ -216,7 +228,12 @@ window.ViewStatuses = (function () {
    * Buffs/debuffs + achievements as two self-contained cards with Apply/Award
    * buttons, so the whole thing can live inside the Sheet and the Feed rather
    * than only on its own tab. */
-  function panel(host) {
+  /* panel(host, opts): opts.postTarget (a feed target) makes the Apply/Award
+   * buttons post the new status/achievement to that feed — that's what the Feed
+   * passes so adding one there posts it directly. */
+  function panel(host, opts) {
+    opts = opts || {};
+    var forced = opts.postTarget ? { forceTarget: opts.postTarget } : undefined;
     var now = Date.now();
     var statuses = Store.state.statuses || [];
     var active = statuses.filter(function (s) { return !s.expiresAt || s.expiresAt > now; });
@@ -230,12 +247,12 @@ window.ViewStatuses = (function () {
 
     host.appendChild(el('section.card', {},
       el('div.stage-head', {}, el('h2', {}, 'Buffs & Debuffs'),
-        el('button.btn.tiny.primary', { onclick: function () { editStatus(null); } }, 'Apply')),
+        el('button.btn.tiny.primary', { onclick: function () { editStatus(null, forced); } }, 'Apply')),
       stBody));
 
     host.appendChild(el('section.card', {},
       el('div.stage-head', {}, el('h2', {}, 'Achievements'),
-        el('button.btn.tiny.primary', { onclick: function () { editAchievement(null); } }, 'Award')),
+        el('button.btn.tiny.primary', { onclick: function () { editAchievement(null, forced); } }, 'Award')),
       achievements.length ? achievements.map(achievementRow) : el('p.muted.small', {}, 'No achievements yet. Award one when you have genuinely earned it.')));
   }
 
@@ -248,7 +265,8 @@ window.ViewStatuses = (function () {
     });
   }
 
-  function editAchievement(a) {
+  function editAchievement(a, opts) {
+    opts = opts || {};
     var isNew = !a;
     var name = textInput(a ? a.name : '', 'Thirty Days Unbroken');
     var desc = textArea(a ? a.description : '', 'What you did to get it.', 2);
@@ -256,7 +274,10 @@ window.ViewStatuses = (function () {
     var iconCtl = Icons.iconField(iconSlug, function (v) { iconSlug = v; });
     var mods = ModEditor.create(a ? a.modifiers : []);
 
-    var share = isNew ? partyPostControl('Announce it on a party feed') : { node: null, target: function () { return null; } };
+    var forced = isNew && opts.forceTarget ? opts.forceTarget : null;
+    var share = forced
+      ? { node: el('p.muted.small', {}, 'Announces on your ' + feedLabel(forced) + ' feed.'), target: function () { return forced; } }
+      : (isNew ? partyPostControl('Announce it on a party feed') : { node: null, target: function () { return null; } });
 
     openModal({
       title: isNew ? 'Award an achievement' : 'Edit achievement',
@@ -301,5 +322,10 @@ window.ViewStatuses = (function () {
     });
   }
 
-  return { render: render, panel: panel };
+  return {
+    render: render, panel: panel,
+    /* Quick-create-and-post helpers for the Feed. Pass the feed target. */
+    newStatus: function (target) { editStatus(null, { forceTarget: target }); },
+    newAchievement: function (target) { editAchievement(null, { forceTarget: target }); }
+  };
 })();

@@ -135,8 +135,18 @@ function openModal(opts) {
     el('div.modal-body', {}, opts.body),
     actions.length ? el('footer.modal-foot', {}, actions) : null);
 
+  /* Close on a backdrop click — but ONLY when the press both started and ended
+   * on the scrim itself. A browser fires `click` on the common ancestor of the
+   * mousedown and mouseup nodes, so selecting text inside a field and releasing
+   * over the backdrop (or the reverse) used to land a `click` on the scrim and
+   * nuke the whole modal, losing everything typed. Tracking where the press
+   * began fixes that: a drag that starts inside the sheet never closes it. */
+  var pressedOnScrim = false;
+  function markPress(e) { pressedOnScrim = (e.target === scrim); }
   var scrim = el('div.scrim', {
-    onclick: function (e) { if (e.target === scrim) close(); }
+    onmousedown: markPress,
+    ontouchstart: markPress,
+    onclick: function (e) { if (e.target === scrim && pressedOnScrim) close(); }
   }, sheet);
 
   root.appendChild(scrim);

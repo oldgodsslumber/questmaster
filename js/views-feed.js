@@ -112,8 +112,15 @@ window.ViewFeed = (function () {
     var isSystem = !!SYSTEM_KIND[p.kind];
     var initial = (p.authorName || '?').slice(0, 1).toUpperCase();
 
+    /* A buff/debuff/achievement/item post carries the same game-icon the crawler
+     * chose for it — show that in the avatar rather than the generic kind emoji,
+     * so the feed matches what they see on the sheet and in their kit. */
+    var avatar = (p.iconSlug && window.Icons)
+      ? el('div.feed-avatar.feed-avatar-icon', {}, Icons.node(p.iconSlug))
+      : el('div.feed-avatar', {}, KIND_ICON[p.kind] || initial);
+
     return el('div.feed-post' + (isSystem ? '.auto' : ''), {},
-      el('div.feed-avatar', {}, KIND_ICON[p.kind] || initial),
+      avatar,
       el('div.feed-body-wrap', {},
         el('div.feed-head', {},
           el('span.feed-author', {}, p.authorName || 'Crawler'),

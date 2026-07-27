@@ -176,7 +176,7 @@ window.ViewStatuses = (function () {
                 var target = share.target();
                 if (target) {
                   var who = (Store.state.character && Store.state.character.name) || 'A crawler';
-                  Party.post(who + (patch.polarity === 'buff' ? ' gained the buff "' : ' took on the debuff "') + patch.name + '".', 'status', null, target)
+                  Party.post(who + (patch.polarity === 'buff' ? ' gained the buff "' : ' took on the debuff "') + patch.name + '".', 'status', { iconSlug: patch.iconSlug || null }, target)
                     .catch(function () { toast('Applied, but the party post failed.', 'bad'); });
                 }
                 toast(patch.name + ' applied.');
@@ -308,7 +308,7 @@ window.ViewStatuses = (function () {
                 var target = share.target();
                 if (target) {
                   var who = (Store.state.character && Store.state.character.name) || 'A crawler';
-                  Party.post(who + ' earned the achievement "' + patch.name + '". 🎖️', 'achievement', null, target)
+                  Party.post(who + ' earned the achievement "' + patch.name + '". 🎖️', 'achievement', { iconSlug: patch.iconSlug || null }, target)
                     .catch(function () {});
                 }
                 App.render();

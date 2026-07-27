@@ -29,13 +29,16 @@ service cloud.firestore {
     function isOwner(uid) {
       return signedIn() && request.auth.uid == uid;
     }
-    /* Same party, and not the degenerate "both have no party" case — otherwise
-     * every partyless user would be able to read every other partyless user. */
+    /* Share at least one party. A crawler can belong to several parties now, so
+     * this is a list intersection rather than an equality — and hasAny over two
+     * empty lists is false, which keeps the "two partyless users can read each
+     * other" hole closed without a special case. */
     function samePartyAs(uid) {
+      let mine = myChar();
       let theirs = get(/databases/$(database)/documents/characters/$(uid)).data;
       return signedIn()
-        && theirs.partyId != null
-        && myChar().partyId == theirs.partyId;
+        && ('partyIds' in mine) && ('partyIds' in theirs)
+        && mine.partyIds.hasAny(theirs.partyIds);
     }
 
     match /characters/{uid} {
@@ -144,6 +147,25 @@ service cloud.firestore {
           && request.auth.uid in get(/databases/$(database)/documents/parties/$(partyId)).data.memberUids;
         allow update, delete: if signedIn() && resource.data.authorUid == request.auth.uid;
       }
+    }
+
+    /* Public crawler cards — the minimal profile (name, level, class, friend
+     * code) other players see. This is what makes a friends list possible
+     * without opening up the private character document: you read a friend's
+     * card here, never their sheet. A card is keyed by its owner's uid and only
+     * that owner may write it; any signed-in user may read one. */
+    match /crawlers/{cuid} {
+      allow read: if signedIn();
+      allow write: if isOwner(cuid);
+    }
+
+    /* Friend-code index: CODE -> { uid }. Lets "add by friend code" resolve to a
+     * uid with a single direct read (no query). You may only point a code at
+     * yourself, so nobody can hijack someone else's code. */
+    match /crawlerCodes/{code} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow delete: if signedIn() && resource.data.uid == request.auth.uid;
     }
   }
 }

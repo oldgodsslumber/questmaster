@@ -62,14 +62,14 @@ Bump the `?v=` query strings in `index.html` and `CONFIG.build` when you ship a 
 | **M2** Quests & tasks | ✅ Quest CRUD with cadence, tasks + subtasks, task XP, auto-complete bonus, quest-level streaks, client-side resets, quick-add |
 | **M3** RPG kit + icon picker | ✅ Skills (XP→Rank), inventory + equip slots, castable spells, buffs/debuffs, achievements, 4,229-icon picker |
 | **M4** Races & Classes | ✅ 12 races, 14 classes, tiered point-buy, detriments at 2-for-1, Earth gating |
-| **M5** Party + sharing | ✅ Parties (create/join by invite code, roster, live snapshots), a shared **newsfeed** (manual posts, journal cross-posts, auto quest turn-ins), and per-quest sharing (view / co-op). Cloud-only — local mode shows a graceful sign-in state. Cross-client co-op *task completion* remains a future add; the rules already permit it. |
+| **M5** Party + friends + sharing | ✅ **Multiple parties** per crawler (create/join by invite code, roster, live snapshots), a **friends list** (add by friend code via a public crawler directory), a shared **newsfeed** combined across your parties and filterable by party (manual posts, journal cross-posts, auto quest turn-ins), and per-quest sharing to a chosen party (view / co-op). Cloud-only — local mode shows a graceful sign-in state. Cross-client co-op *task completion* remains a future add; the rules already permit it. |
 | **M6** Export + polish | 🟡 PNG export works; responsive pass and empty states are in |
 
 Quest documents already carried `visibility`, `shareMode`, `sharedWith` and `partyId`, and `firestore.rules` already enforced the co-op task-completion rule, so M5 slotted in without a migration.
 
 **Character creation** now also lets you homebrew as you register: add custom skills (name/icon/rank), define a custom starting class or pick one from the roster, and build your own gear pack — all inline in the wizard, alongside the write-your-own hinges that were already there.
 
-**Parties** are top-level Firestore documents keyed by their own invite code, so joining is a direct `get(parties/CODE)` — no query, no composite index. The Party and Feed screens are the only place in the app that subscribes to live snapshots; everything else still follows the fetch-once rule.
+**Parties** are top-level Firestore documents keyed by their own invite code, so joining is a direct `get(parties/CODE)` — no query, no composite index. A crawler carries a `partyIds` array (migrated automatically from the old single `partyId`) and can be in several at once; the Feed blends them into one stream, tagged and filterable by party. **Friends** work the same keyed-lookup way: a public `crawlers/{uid}` card holds the shareable minimal profile and a `crawlerCodes/{CODE}` index resolves a friend code to a uid, so "add by code" is one read and never exposes anyone's private sheet. The Party and Feed screens are the only place in the app that subscribes to live snapshots; everything else still follows the fetch-once rule.
 
 ---
 

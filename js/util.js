@@ -296,3 +296,30 @@ function emptyState(icon, title, sub) {
     el('div.empty-title', {}, title),
     sub ? el('div.empty-sub', {}, sub) : null);
 }
+
+/* Shared control for opting a journal entry, status or achievement into a party
+ * feed. Returns { node, target() }: target() is the chosen party code, or null
+ * for "don't post". Renders nothing (and always targets null) when the crawler
+ * is in no parties; a checkbox when in exactly one; a select when in several. */
+function partyPostControl(label) {
+  var none = { node: null, target: function () { return null; } };
+  if (!(window.Party && Party.available() && Party.inAnyParty())) return none;
+
+  var parties = Party.partyList();
+  if (parties.length === 1) {
+    var code = Party.codeOf(parties[0]);
+    var cb = el('input', { type: 'checkbox' });
+    return {
+      node: el('label.share-toggle', {}, cb, el('span', {}, label || ('Also post to ' + parties[0].name + ' feed'))),
+      target: function () { return cb.checked ? code : null; }
+    };
+  }
+
+  var sel = selectInput([{ value: '', label: "Don't post to a feed" }].concat(parties.map(function (p) {
+    return { value: Party.codeOf(p), label: 'Post to ' + p.name };
+  })), '');
+  return {
+    node: field(label || 'Share to a party feed', sel),
+    target: function () { return sel.value || null; }
+  };
+}

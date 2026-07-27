@@ -369,22 +369,30 @@ window.ViewQuests = (function () {
    * this collapses to an honest note rather than a dead dropdown. Returns the
    * node plus an apply() that writes visibility/shareMode/partyId onto a patch. */
   function shareControls(q) {
-    if (!(window.Party && Party.available() && Party.inParty())) {
+    if (!(window.Party && Party.available())) {
       return {
-        node: el('div.note', {},
-          el('b', {}, 'Private. '),
-          (window.Party && Party.available())
-            ? 'Join a party (Party tab) to share quests and post turn-ins to the feed.'
-            : 'Sign in with Google and join a party to share quests with other crawlers.'),
+        node: el('div.note', {}, el('b', {}, 'Private. '),
+          'Sign in with Google and join a party to share quests with other crawlers.'),
+        apply: function () {}
+      };
+    }
+    if (!Party.inAnyParty()) {
+      return {
+        node: el('div.note', {}, el('b', {}, 'Private. '),
+          'Join a party on the Party tab to share quests and post turn-ins to a feed.'),
         apply: function () {}
       };
     }
 
-    var startVis = q && (q.visibility === 'party' || q.visibility === 'shared') ? 'party' : 'private';
-    var visSel = selectInput([
-      { value: 'private', label: 'Private — only you' },
-      { value: 'party', label: 'Share with your party' }
-    ], startVis);
+    var parties = Party.partyList();
+    /* The visibility dropdown is Private plus one entry per party — sharing a
+     * quest means picking which party's feed its turn-ins go to. */
+    var startVal = (q && (q.visibility === 'party' || q.visibility === 'shared') && q.partyId) ? q.partyId : 'private';
+    if (startVal !== 'private' && !parties.some(function (p) { return Party.codeOf(p) === startVal; })) startVal = 'private';
+
+    var visSel = selectInput([{ value: 'private', label: 'Private — only you' }].concat(
+      parties.map(function (p) { return { value: Party.codeOf(p), label: 'Share with ' + p.name }; })
+    ), startVal);
 
     var modeSel = selectInput([
       { value: 'view', label: 'View only — they can watch progress' },
@@ -392,23 +400,23 @@ window.ViewQuests = (function () {
     ], q && q.shareMode === 'coop' ? 'coop' : 'view');
 
     var modeWrap = field('Party access', modeSel);
-    function syncVis() { modeWrap.style.display = visSel.value === 'party' ? '' : 'none'; }
+    function syncVis() { modeWrap.style.display = visSel.value === 'private' ? 'none' : ''; }
     visSel.addEventListener('change', syncVis);
     syncVis();
 
     return {
       node: el('div', {},
-        field('Visibility', visSel, 'Shared quests post their turn-ins to the party feed.'),
+        field('Visibility', visSel, 'A shared quest posts its turn-ins to that party feed.'),
         modeWrap),
       apply: function (patch) {
-        var p = Party.current();
-        if (visSel.value === 'party') {
+        if (visSel.value !== 'private') {
           patch.visibility = 'party';
           patch.shareMode = modeSel.value === 'coop' ? 'coop' : 'view';
-          patch.partyId = (p && (p.inviteCode || p.id)) || null;
+          patch.partyId = visSel.value;
         } else {
           patch.visibility = 'private';
           patch.shareMode = 'view';
+          patch.partyId = null;
         }
       }
     };

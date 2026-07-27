@@ -421,6 +421,14 @@ window.Store = (function () {
   function removeFeedPost(partyId, postId) { return backend.deleteDoc(['parties', partyId, 'feed', postId]); }
   function subscribeFeed(partyId, cb) { return backend.subscribeCollection(['parties', partyId, 'feed'], cb); }
 
+  /* Public crawler directory — friend cards keyed by uid, plus a CODE -> uid
+   * index so "add by friend code" is a direct read. Both are top-level. */
+  function getCrawler(cuid) { return backend.getDoc(['crawlers', cuid]); }
+  function saveCrawler(cuid, data) { return backend.setDoc(['crawlers', cuid], data); }
+  function subscribeCrawler(cuid, cb) { return backend.subscribeDoc(['crawlers', cuid], cb); }
+  function getCrawlerCode(code) { return backend.getDoc(['crawlerCodes', code]); }
+  function saveCrawlerCode(code, data) { return backend.setDoc(['crawlerCodes', code], data); }
+
   return {
     state: state,
     attach: attach, detach: detach, load: load, loadQuests: loadQuests,
@@ -434,6 +442,8 @@ window.Store = (function () {
     loadEntries: loadEntries, addEntry: addEntry, removeEntry: removeEntry, logEvent: logEvent,
     isCloud: isCloud,
     getParty: getParty, saveParty: saveParty, deleteParty: deleteParty, subscribeParty: subscribeParty,
-    addFeedPost: addFeedPost, listFeed: listFeed, removeFeedPost: removeFeedPost, subscribeFeed: subscribeFeed
+    addFeedPost: addFeedPost, listFeed: listFeed, removeFeedPost: removeFeedPost, subscribeFeed: subscribeFeed,
+    getCrawler: getCrawler, saveCrawler: saveCrawler, subscribeCrawler: subscribeCrawler,
+    getCrawlerCode: getCrawlerCode, saveCrawlerCode: saveCrawlerCode
   };
 })();

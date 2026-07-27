@@ -900,3 +900,13 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 .entry-body.md { white-space: normal; }
 .entry-title { font-weight: 700; font-size: 1rem; margin-bottom: 4px; color: var(--ink); }
 .composer .input:not(.area) { margin-bottom: 2px; }
+
+/* ---- Multi-party feed: filter chips, party tags, post target ------------- */
+.feed-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.feed-filter { font-size: .8rem; padding: 5px 12px; border-radius: 99px; background: var(--bg-2); border: 1px solid var(--line); color: var(--ink-2); cursor: pointer; }
+.feed-filter:hover { border-color: var(--line-2); }
+.feed-filter.on { background: rgba(212, 160, 39, .12); border-color: var(--accent); color: var(--accent); }
+.feed-party-tag { font-family: var(--mono); font-size: .58rem; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-3); border: 1px solid var(--line-2); border-radius: 4px; padding: 1px 5px; }
+.feed-target { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+.feed-target select { max-width: 170px; }
+.party-card { margin-bottom: 12px; }

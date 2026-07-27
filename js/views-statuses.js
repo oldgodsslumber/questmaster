@@ -104,8 +104,7 @@ window.ViewStatuses = (function () {
     var iconCtl = Icons.iconField(iconSlug, function (v) { iconSlug = v; });
     var mods = ModEditor.create(s ? s.modifiers : [], { positiveOnly: true });
 
-    var canShare = window.Party && Party.available() && Party.inParty();
-    var shareToFeed = el('input', { type: 'checkbox' });
+    var share = isNew ? partyPostControl('Also post to a party feed') : { node: null, target: function () { return null; } };
 
     var durMode = selectInput([
       { value: 'none', label: 'Until I clear it' },
@@ -127,7 +126,7 @@ window.ViewStatuses = (function () {
           el('span.field-label', {}, 'Modifiers'),
           el('span.field-hint', {}, 'Enter positive values with + or ×. A debuff applies the opposite automatically — +2 becomes −2, ×2 becomes ÷2.'),
           mods),
-        canShare ? el('label.share-toggle', {}, shareToFeed, el('span', {}, 'Also post to party feed')) : null),
+        share.node),
       actions: (isNew ? [] : [{
         label: 'Clear', kind: 'danger', onClick: function () { clearStatus(s); }
       }]).concat([
@@ -151,9 +150,10 @@ window.ViewStatuses = (function () {
             op.then(function () {
               if (isNew) {
                 Store.logEvent('status-applied', patch.name + ' applied (' + patch.polarity + ').');
-                if (canShare && shareToFeed.checked) {
+                var target = share.target();
+                if (target) {
                   var who = (Store.state.character && Store.state.character.name) || 'A crawler';
-                  Party.post(who + (patch.polarity === 'buff' ? ' gained the buff "' : ' took on the debuff "') + patch.name + '".', 'status')
+                  Party.post(who + (patch.polarity === 'buff' ? ' gained the buff "' : ' took on the debuff "') + patch.name + '".', 'status', null, target)
                     .catch(function () { toast('Applied, but the party post failed.', 'bad'); });
                 }
                 toast(patch.name + ' applied.');
@@ -202,8 +202,7 @@ window.ViewStatuses = (function () {
     var iconCtl = Icons.iconField(iconSlug, function (v) { iconSlug = v; });
     var mods = ModEditor.create(a ? a.modifiers : []);
 
-    var canShare = window.Party && Party.available() && Party.inParty();
-    var shareToFeed = el('input', { type: 'checkbox', checked: isNew });
+    var share = isNew ? partyPostControl('Announce it on a party feed') : { node: null, target: function () { return null; } };
 
     openModal({
       title: isNew ? 'Award an achievement' : 'Edit achievement',
@@ -215,7 +214,7 @@ window.ViewStatuses = (function () {
           el('span.field-label', {}, 'Permanent modifiers'),
           el('span.field-hint', {}, 'Optional — plenty of achievements are just a record.'),
           mods),
-        canShare && isNew ? el('label.share-toggle', {}, shareToFeed, el('span', {}, 'Announce it on the party feed')) : null),
+        share.node),
       actions: (isNew ? [] : [{
         label: 'Delete', kind: 'danger', onClick: function () { Store.remove('achievements', a.id).then(App.render); }
       }]).concat([
@@ -231,9 +230,10 @@ window.ViewStatuses = (function () {
             };
             if (isNew) {
               Progress.grantAchievement(patch).then(function () {
-                if (canShare && shareToFeed.checked) {
+                var target = share.target();
+                if (target) {
                   var who = (Store.state.character && Store.state.character.name) || 'A crawler';
-                  Party.post(who + ' earned the achievement "' + patch.name + '". 🎖️', 'achievement')
+                  Party.post(who + ' earned the achievement "' + patch.name + '". 🎖️', 'achievement', null, target)
                     .catch(function () {});
                 }
                 App.render();

@@ -98,8 +98,7 @@ window.ViewJournal = (function () {
     var area = textArea('', 'What happened? Markdown works here.', 3);
     area.setAttribute('data-focus-key', 'journal-composer');
     var usedTemplate = null;
-    var canShare = window.Party && Party.available() && Party.inParty();
-    var shareToParty = el('input', { type: 'checkbox' });
+    var share = partyPostControl('Also post to a party feed');
 
     var starters = el('div.starter-strip', {}, SEED.statusStarters.map(function (s) {
       return el('button.starter', {
@@ -128,14 +127,15 @@ window.ViewJournal = (function () {
         return;
       }
       var title = titleIn.value.trim();
-      Store.addEntry(currentId, { kind: 'manual', title: title || null, body: body, template: usedTemplate, postedToParty: canShare && shareToParty.checked })
+      var target = share.target();
+      Store.addEntry(currentId, { kind: 'manual', title: title || null, body: body, template: usedTemplate, postedToParty: !!target })
         .then(function () {
-          if (canShare && shareToParty.checked) {
-            return Party.post(body, 'journal', title ? { title: title } : null).catch(function () { toast('Logged, but the party post failed.', 'bad'); });
+          if (target) {
+            return Party.post(body, 'journal', title ? { title: title } : null, target).catch(function () { toast('Logged, but the party post failed.', 'bad'); });
           }
         })
         .then(function () { return Store.loadEntries(currentId); })
-        .then(function () { toast(canShare && shareToParty.checked ? 'Logged and shared.' : 'Logged.'); App.render(); });
+        .then(function () { toast(target ? 'Logged and shared.' : 'Logged.'); App.render(); });
     }
 
     return el('section.card.composer', {},
@@ -144,9 +144,7 @@ window.ViewJournal = (function () {
       area,
       el('span.field-hint', {}, 'Markdown supported — **bold**, *italic*, # headings, lists, and [links](url).'),
       el('div.composer-foot', {},
-        canShare
-          ? el('label.share-toggle', {}, shareToParty, el('span', {}, 'Also post to party feed'))
-          : el('span.muted.small', {}, 'Private to you.'),
+        share.node || el('span.muted.small', {}, 'Private to you.'),
         el('button.btn.primary', { onclick: post }, 'Log it')));
   }
 

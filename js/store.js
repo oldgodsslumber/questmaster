@@ -189,20 +189,31 @@ window.Store = (function () {
   function base() { return ['characters', uid]; }
 
   /* Pull everything. One round of parallel reads, then the app renders from
-   * memory until something writes. */
+   * memory until something writes.
+   *
+   * Every subcollection read is made fault-tolerant: a single denied or failing
+   * read defaults to empty instead of rejecting the whole load. Otherwise adding
+   * a new subcollection to the code (abilities, lootboxes) would lock out anyone
+   * whose deployed firestore.rules predate it — one permission-denied would
+   * bounce them straight back to the sign-in screen. Login only needs the
+   * character document itself. */
   function load() {
     resetState();
     return backend.getDoc(base()).then(function (char) {
       if (!char) return null;
       state.character = Object.assign({ id: uid }, char);
 
+      function soft(name, promise, onOk) {
+        return promise.then(onOk).catch(function (e) {
+          console.warn('[qm] could not read "' + name + '" — is firestore.rules deployed? Continuing without it.', e);
+        });
+      }
+
       var jobs = SUBCOLLECTIONS.map(function (name) {
-        return backend.listCollection(base().concat(name)).then(function (docs) { state[name] = docs; });
+        return soft(name, backend.listCollection(base().concat(name)), function (docs) { state[name] = docs; });
       });
-      jobs.push(loadQuests());
-      jobs.push(backend.listCollection(base().concat('logbooks')).then(function (docs) {
-        state.logbooks = docs;
-      }));
+      jobs.push(soft('quests', loadQuests()));
+      jobs.push(soft('logbooks', backend.listCollection(base().concat('logbooks')), function (docs) { state.logbooks = docs; }));
 
       return Promise.all(jobs).then(function () {
         sortAll();

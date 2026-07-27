@@ -94,7 +94,10 @@ window.ViewJournal = (function () {
 
   function composer() {
     var area = textArea('', 'What happened?', 3);
+    area.setAttribute('data-focus-key', 'journal-composer');
     var usedTemplate = null;
+    var canShare = window.Party && Party.available() && Party.inParty();
+    var shareToParty = el('input', { type: 'checkbox' });
 
     var starters = el('div.starter-strip', {}, SEED.statusStarters.map(function (s) {
       return el('button.starter', {
@@ -116,16 +119,23 @@ window.ViewJournal = (function () {
         toast('Fill in the blank first.', 'bad');
         return;
       }
-      Store.addEntry(currentId, { kind: 'manual', body: body, template: usedTemplate })
+      Store.addEntry(currentId, { kind: 'manual', body: body, template: usedTemplate, postedToParty: canShare && shareToParty.checked })
+        .then(function () {
+          if (canShare && shareToParty.checked) {
+            return Party.post(body, 'journal').catch(function () { toast('Logged, but the party post failed.', 'bad'); });
+          }
+        })
         .then(function () { return Store.loadEntries(currentId); })
-        .then(function () { toast('Logged.'); App.render(); });
+        .then(function () { toast(canShare && shareToParty.checked ? 'Logged and shared.' : 'Logged.'); App.render(); });
     }
 
     return el('section.card.composer', {},
       el('details', {}, el('summary', {}, 'Starters'), starters),
       area,
       el('div.composer-foot', {},
-        el('span.muted.small', {}, 'Private. Posting to a party feed arrives with the party layer.'),
+        canShare
+          ? el('label.share-toggle', {}, shareToParty, el('span', {}, 'Also post to party feed'))
+          : el('span.muted.small', {}, 'Private to you.'),
         el('button.btn.primary', { onclick: post }, 'Log it')));
   }
 

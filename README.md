@@ -62,10 +62,14 @@ Bump the `?v=` query strings in `index.html` and `CONFIG.build` when you ship a 
 | **M2** Quests & tasks | ✅ Quest CRUD with cadence, tasks + subtasks, task XP, auto-complete bonus, quest-level streaks, client-side resets, quick-add |
 | **M3** RPG kit + icon picker | ✅ Skills (XP→Rank), inventory + equip slots, castable spells, buffs/debuffs, achievements, 4,229-icon picker |
 | **M4** Races & Classes | ✅ 12 races, 14 classes, tiered point-buy, detriments at 2-for-1, Earth gating |
-| **M5** Party + sharing | ⬜ Not built. The **journal half ships** (logbooks, templated composer, auto-events) — party feed, quest sharing and co-op XP do not |
+| **M5** Party + sharing | ✅ Parties (create/join by invite code, roster, live snapshots), a shared **newsfeed** (manual posts, journal cross-posts, auto quest turn-ins), and per-quest sharing (view / co-op). Cloud-only — local mode shows a graceful sign-in state. Cross-client co-op *task completion* remains a future add; the rules already permit it. |
 | **M6** Export + polish | 🟡 PNG export works; responsive pass and empty states are in |
 
-Quest documents already carry `visibility`, `shareMode`, `sharedWith` and `partyId`, and `firestore.rules` already enforces the co-op task-completion rule — so M5 is additive, not a migration.
+Quest documents already carried `visibility`, `shareMode`, `sharedWith` and `partyId`, and `firestore.rules` already enforced the co-op task-completion rule, so M5 slotted in without a migration.
+
+**Character creation** now also lets you homebrew as you register: add custom skills (name/icon/rank), define a custom starting class or pick one from the roster, and build your own gear pack — all inline in the wizard, alongside the write-your-own hinges that were already there.
+
+**Parties** are top-level Firestore documents keyed by their own invite code, so joining is a direct `get(parties/CODE)` — no query, no composite index. The Party and Feed screens are the only place in the app that subscribes to live snapshots; everything else still follows the fetch-once rule.
 
 ---
 

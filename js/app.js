@@ -17,11 +17,21 @@ window.App = (function () {
     '#/inventory': { label: 'Kit', icon: '🎒', view: function () { return ViewInventory; } },
     '#/statuses': { label: 'Status', icon: '✨', view: function () { return ViewStatuses; } },
     '#/build': { label: 'Build', icon: '🧬', view: function () { return ViewBuild; } },
+    '#/party': { label: 'Party', icon: '👥', view: function () { return ViewParty; } },
+    '#/feed': { label: 'Feed', icon: '📰', view: function () { return ViewFeed; } },
     '#/journal': { label: 'Journal', icon: '📖', view: function () { return ViewJournal; } }
   };
-  var NAV_ORDER = ['#/sheet', '#/quests', '#/skills', '#/inventory', '#/statuses', '#/build', '#/journal'];
+  var NAV_ORDER = ['#/sheet', '#/quests', '#/skills', '#/inventory', '#/statuses', '#/build', '#/party', '#/feed', '#/journal'];
 
   var stage = 'boot';    /* boot | signin | create | app */
+
+  /* The render loop repaints the whole view on every mutation. Without help,
+   * that throws away scroll position and keyboard focus — so tapping a checkbox
+   * halfway down the quest list snapped the page back to the top. We remember
+   * the hash we last painted; when a repaint stays on the same view we restore
+   * the scroll offset and re-focus the control that had focus, keyed off a
+   * stable data-focus-key the views stamp on interactive elements. */
+  var lastPaintedHash = null;
 
   /* ---- Boot ------------------------------------------------------------------- */
 
@@ -29,6 +39,15 @@ window.App = (function () {
     document.getElementById('build-tag').textContent = CONFIG.build;
 
     window.addEventListener('hashchange', function () { if (stage === 'app') render(); });
+
+    /* A live party/feed snapshot arriving from another member repaints, but only
+     * while those screens are open — otherwise a teammate's post would yank the
+     * scroll position on an unrelated view. */
+    if (window.Party) {
+      Party.onChange(function () {
+        if (stage === 'app' && (location.hash === '#/party' || location.hash === '#/feed')) render();
+      });
+    }
 
     /* firebase-config.js calls back once Google auth resolves. If the config is
      * still a placeholder it never loads, so we fall through to the local
@@ -60,6 +79,7 @@ window.App = (function () {
 
   function onAuth(user) {
     if (!user) {
+      if (window.Party) Party.detach();
       Store.detach();
       stage = 'signin';
       render();
@@ -82,6 +102,7 @@ window.App = (function () {
          * would see yesterday's checkmarks for a frame. */
         return Progress.runResets().then(function () {
           stage = 'app';
+          if (window.Party) Party.attach();
           if (!location.hash || !ROUTES[location.hash]) location.hash = '#/quests';
           render();
         });
@@ -97,6 +118,7 @@ window.App = (function () {
   function afterCreate() {
     return Store.load().then(function () {
       stage = 'app';
+      if (window.Party) Party.attach();
       location.hash = '#/sheet';
       render();
     });
@@ -107,18 +129,27 @@ window.App = (function () {
   function render() {
     var main = document.getElementById('view');
     var nav = document.getElementById('nav');
+
+    /* Snapshot what we're about to destroy, so a same-view repaint can put it
+     * back. Only meaningful in the app stage; boot/signin/create always start
+     * fresh at the top. */
+    var keepPosition = stage === 'app' && lastPaintedHash === location.hash;
+    var prevScroll = keepPosition ? (window.scrollY || document.documentElement.scrollTop || 0) : 0;
+    var focusState = keepPosition ? captureFocus(main) : null;
+
     clear(main);
 
     if (stage === 'boot') {
       nav.hidden = true;
+      lastPaintedHash = null;
       main.appendChild(el('div.boot', {},
         el('div.spinner'),
         el('p.muted', {}, 'Contacting the System…')));
       return;
     }
 
-    if (stage === 'signin') { nav.hidden = true; renderSignIn(main); return; }
-    if (stage === 'create') { nav.hidden = true; ViewCreate.render(main); return; }
+    if (stage === 'signin') { nav.hidden = true; lastPaintedHash = null; renderSignIn(main); return; }
+    if (stage === 'create') { nav.hidden = true; lastPaintedHash = null; ViewCreate.render(main); return; }
 
     nav.hidden = false;
     paintNav(nav);
@@ -132,6 +163,39 @@ window.App = (function () {
       wrap.appendChild(emptyState('💥', 'This view failed to draw', e.message));
     }
     main.appendChild(wrap);
+
+    lastPaintedHash = location.hash;
+    if (keepPosition) {
+      if (prevScroll) window.scrollTo(0, prevScroll);
+      restoreFocus(main, focusState);
+    }
+  }
+
+  /* Record which interactive element had focus and where its text caret sat, so
+   * the freshly-rebuilt copy can inherit both. Elements opt in by carrying a
+   * data-focus-key; that keeps the match stable across a repaint even though the
+   * old node is discarded. */
+  function captureFocus(root) {
+    var a = document.activeElement;
+    if (!a || !root.contains(a)) return null;
+    var key = a.getAttribute && a.getAttribute('data-focus-key');
+    if (!key) return null;
+    var st = { key: key };
+    if ('selectionStart' in a) {
+      st.selStart = a.selectionStart;
+      st.selEnd = a.selectionEnd;
+    }
+    return st;
+  }
+
+  function restoreFocus(root, st) {
+    if (!st) return;
+    var next = root.querySelector('[data-focus-key="' + st.key.replace(/"/g, '\\"') + '"]');
+    if (!next) return;
+    next.focus();
+    if (st.selStart != null && 'setSelectionRange' in next) {
+      try { next.setSelectionRange(st.selStart, st.selEnd); } catch (e) { /* non-text input */ }
+    }
   }
 
   function paintNav(nav) {
@@ -192,6 +256,7 @@ window.App = (function () {
 
   function signOut() {
     confirmModal('Sign out?', 'Your character stays in the cloud. You can sign back in any time.', function () {
+      if (window.Party) Party.detach();
       if (window.QMAuth) window.QMAuth.signOut();
       Store.detach();
       stage = 'signin';

@@ -116,11 +116,23 @@ service cloud.firestore {
         && request.auth.uid in request.resource.data.memberUids
         && request.resource.data.memberUids.size() <= 8;
 
-      /* Any change must leave the editor a member — this is how a joiner adds
-       * themselves, and how a leaver cannot also delete everyone else. */
+      /* Two legitimate updates, and nothing else:
+       *   - an existing member changes the roster (including leaving), or
+       *   - a NON-member joins by adding only themselves, and every current
+       *     member is preserved (hasAll) so a stranger can't read a party and
+       *     rewrite memberUids to eject everyone.
+       * The old rule only checked the *result* contained the editor, which let
+       * any signed-in user overwrite the whole roster. */
       allow update: if signedIn()
-        && (isMember() || request.auth.uid in request.resource.data.memberUids)
-        && request.resource.data.memberUids.size() <= 8;
+        && request.resource.data.memberUids.size() <= 8
+        && (
+          isMember()
+          || (
+            !(request.auth.uid in resource.data.memberUids)
+            && request.auth.uid in request.resource.data.memberUids
+            && request.resource.data.memberUids.hasAll(resource.data.memberUids)
+          )
+        );
 
       allow delete: if false;
 

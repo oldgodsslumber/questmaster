@@ -804,3 +804,74 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* ---- M5: party, feed, and custom-creation additions ---------------------- */
+
+/* A value already held by another attribute — tappable to swap. */
+.array-btn.taken { border-color: var(--info); color: var(--info); border-style: dashed; }
+
+/* Homebrew marker, sits next to a pick/class/gear name. */
+.custom-chip {
+  font-family: var(--mono); font-size: .58rem; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--magic); border: 1px solid var(--magic); border-radius: 4px; padding: 1px 5px; margin-left: 6px;
+}
+
+/* "Add your own" tiles in the creation pick grids. */
+.pick-add { align-items: center; justify-content: center; text-align: center; border-style: dashed; color: var(--ink-2); min-height: 78px; }
+.pick-add:hover { border-color: var(--accent); color: var(--accent); }
+.pick-add-plus { font-size: 1.5rem; font-weight: 600; line-height: 1; color: var(--ink-3); }
+.pick.pick-wide { flex-direction: row; align-items: center; gap: 12px; width: 100%; }
+.pick.pick-wide > div { min-width: 0; }
+
+.custom-skill-list { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.custom-skill-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--r-sm); }
+.custom-skill-name { flex: 1; font-size: .88rem; font-weight: 600; min-width: 0; }
+.custom-skill-row > .icon-btn { margin-left: auto; }
+
+/* Party screen ------------------------------------------------------------- */
+.party-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; justify-content: space-between; }
+.party-banner-main { min-width: 0; }
+.party-name { font-family: var(--mono); font-size: 1.2rem; font-weight: 600; color: var(--accent); }
+.invite-box { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+.invite-label { font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3); font-family: var(--mono); }
+.invite-code-row { display: flex; align-items: center; gap: 8px; }
+.invite-code {
+  font-family: var(--mono); font-size: 1.35rem; font-weight: 600; letter-spacing: .22em;
+  color: var(--ink); background: var(--bg-2); border: 1px dashed var(--accent);
+  border-radius: var(--r-sm); padding: 4px 12px 4px 14px;
+}
+.code-input { font-family: var(--mono); font-size: 1.2rem; letter-spacing: .2em; text-transform: uppercase; text-align: center; }
+
+.roster { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.roster-row { display: flex; align-items: center; gap: 11px; padding: 8px; background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--r-sm); }
+.roster-row.me { border-color: var(--accent); background: rgba(212, 160, 39, .07); }
+.roster-avatar {
+  width: 34px; height: 34px; flex: 0 0 34px; border-radius: 50%;
+  display: grid; place-items: center; font-family: var(--mono); font-weight: 600;
+  background: var(--panel-2); border: 1px solid var(--line-2); color: var(--accent);
+}
+.roster-main { min-width: 0; }
+.roster-name { font-weight: 600; font-size: .92rem; display: flex; align-items: center; gap: 6px; }
+.roster-tag { font-family: var(--mono); font-size: .56rem; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3); border: 1px solid var(--line-2); border-radius: 4px; padding: 1px 4px; }
+.roster-tag.leader { color: var(--accent); border-color: rgba(212, 160, 39, .4); }
+
+/* Feed --------------------------------------------------------------------- */
+.feed { display: flex; flex-direction: column; gap: 10px; }
+.feed-post { display: flex; gap: 11px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 11px var(--pad); }
+.feed-post.auto { border-left: 3px solid var(--accent); background: var(--bg-2); }
+.feed-avatar {
+  width: 34px; height: 34px; flex: 0 0 34px; border-radius: 50%;
+  display: grid; place-items: center; font-family: var(--mono); font-weight: 600; font-size: .95rem;
+  background: var(--panel-2); border: 1px solid var(--line-2); color: var(--accent);
+}
+.feed-body-wrap { flex: 1; min-width: 0; }
+.feed-head { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+.feed-author { font-weight: 600; font-size: .88rem; }
+.feed-time { margin-left: auto; }
+.feed-head > .icon-btn { margin-left: 0; }
+.feed-text { font-size: .9rem; line-height: 1.5; color: var(--ink); white-space: pre-wrap; word-break: break-word; }
+.feed-post.auto .feed-text { color: var(--ink-2); }
+
+/* "Also post to party" toggle in the journal composer. */
+.share-toggle { flex: 1; display: flex; align-items: center; gap: 7px; font-size: .82rem; color: var(--ink-2); cursor: pointer; }
+.share-toggle input { accent-color: var(--accent); width: 16px; height: 16px; }

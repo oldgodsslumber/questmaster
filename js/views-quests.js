@@ -57,6 +57,7 @@ window.ViewQuests = (function () {
     var input = el('input.input', {
       type: 'text',
       placeholder: 'Quick-add a task…',
+      'data-focus-key': 'quests-quickadd',
       onkeydown: function (e) { if (e.key === 'Enter') go(); }
     });
 
@@ -256,7 +257,10 @@ window.ViewQuests = (function () {
       : Promise.resolve();
 
     undo.then(function () { return Store.removeTask(q.id, t.id); })
-      .then(function () { return Progress.reconcileQuest(q); })
+      /* Structural sync, not reconcile: deleting a task must never *pay* a
+       * completion bonus. Removing the last unfinished task just closes the
+       * quest silently; it does not earn the turn-in reward. */
+      .then(function () { return Progress.syncQuestStatus(q); })
       .then(function () { App.render(); });
   }
 
@@ -299,15 +303,15 @@ window.ViewQuests = (function () {
 
     var iconCtl = Icons.iconField(draft.iconSlug, function (slug) { draft.iconSlug = slug; });
 
+    var share = shareControls(q);
+
     var body = el('div', {},
       field('Quest title', title),
       field('Description', desc),
       el('div.form-row', {}, field('Icon', iconCtl), field('Bonus XP', bonus, 'Paid when every task is done.')),
       field('Cadence', cadence, 'All tasks in the quest reset together on this rhythm.'),
       weekWrap, monthWrap,
-      el('div.note', {},
-        el('b', {}, 'Private. '),
-        'Sharing a quest with your party — view-only or co-op — arrives with the party layer. The fields are already in the data model, so nothing here needs redoing.'));
+      share.node);
 
     openModal({
       title: isNew ? 'New quest' : 'Edit quest',
@@ -328,6 +332,7 @@ window.ViewQuests = (function () {
               resetDayOfMonth: Math.max(1, Math.min(31, parseInt(domSel.value, 10) || 1))
             };
             patch.nextResetAt = Engine.nextResetAt(cad, Date.now(), patch);
+            share.apply(patch, q);
 
             var op = isNew ? Store.addQuest(patch) : Store.updateQuest(q.id, patch);
             op.then(function (saved) {
@@ -341,6 +346,55 @@ window.ViewQuests = (function () {
     });
 
     syncCadence();
+  }
+
+  /* Sharing controls, only meaningful in a cloud party. When you're not in one,
+   * this collapses to an honest note rather than a dead dropdown. Returns the
+   * node plus an apply() that writes visibility/shareMode/partyId onto a patch. */
+  function shareControls(q) {
+    if (!(window.Party && Party.available() && Party.inParty())) {
+      return {
+        node: el('div.note', {},
+          el('b', {}, 'Private. '),
+          (window.Party && Party.available())
+            ? 'Join a party (Party tab) to share quests and post turn-ins to the feed.'
+            : 'Sign in with Google and join a party to share quests with other crawlers.'),
+        apply: function () {}
+      };
+    }
+
+    var startVis = q && (q.visibility === 'party' || q.visibility === 'shared') ? 'party' : 'private';
+    var visSel = selectInput([
+      { value: 'private', label: 'Private — only you' },
+      { value: 'party', label: 'Share with your party' }
+    ], startVis);
+
+    var modeSel = selectInput([
+      { value: 'view', label: 'View only — they can watch progress' },
+      { value: 'coop', label: 'Co-op — they can complete tasks too' }
+    ], q && q.shareMode === 'coop' ? 'coop' : 'view');
+
+    var modeWrap = field('Party access', modeSel);
+    function syncVis() { modeWrap.style.display = visSel.value === 'party' ? '' : 'none'; }
+    visSel.addEventListener('change', syncVis);
+    syncVis();
+
+    return {
+      node: el('div', {},
+        field('Visibility', visSel, 'Shared quests post their turn-ins to the party feed.'),
+        modeWrap),
+      apply: function (patch) {
+        var p = Party.current();
+        if (visSel.value === 'party') {
+          patch.visibility = 'party';
+          patch.shareMode = modeSel.value === 'coop' ? 'coop' : 'view';
+          patch.partyId = (p && (p.inviteCode || p.id)) || null;
+        } else {
+          patch.visibility = 'private';
+          patch.shareMode = 'view';
+        }
+      }
+    };
   }
 
   /* ---- Task editor ---------------------------------------------------------------- */
@@ -442,7 +496,9 @@ window.ViewQuests = (function () {
       };
 
       var op = isNew ? Store.addTask(q.id, patch) : Store.updateTask(q.id, t.id, patch);
-      op.then(function () { return Progress.reconcileQuest(q); }).then(function () { App.render(); });
+      /* Structural sync: adding a task to a finished quest reopens it without
+       * clawing back the streak it already earned this period. */
+      op.then(function () { return Progress.syncQuestStatus(q); }).then(function () { App.render(); });
     }
   }
 

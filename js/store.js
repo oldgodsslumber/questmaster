@@ -90,6 +90,18 @@ window.Store = (function () {
       addDoc: function (path, data) {
         var id = uidgen();
         return this.setDoc(path.concat(id), data).then(function () { return id; });
+      },
+      /* Local mode has no other players, so live subscription is a no-op that
+       * simply hands back the current value once and an unsubscribe that does
+       * nothing. The party layer is cloud-only and guards on kind === 'cloud'
+       * before ever reaching here. */
+      subscribeCollection: function (path, cb) {
+        this.listCollection(path).then(cb);
+        return function () {};
+      },
+      subscribeDoc: function (path, cb) {
+        this.getDoc(path).then(cb);
+        return function () {};
       }
     };
   }
@@ -135,6 +147,21 @@ window.Store = (function () {
       addDoc: function (path, data) {
         var id = uidgen();
         return fb.setDoc(ref(path.concat(id)), data).then(function () { return id; });
+      },
+      /* Live listeners — the party feed and roster are the one place two people
+       * touch the same document, so this is where snapshots finally earn their
+       * keep. Both return the Firestore unsubscribe function. */
+      subscribeCollection: function (path, cb) {
+        return fb.onSnapshot(coll(path), function (snap) {
+          var out = [];
+          snap.forEach(function (d) { out.push(Object.assign({ id: d.id }, d.data())); });
+          cb(out);
+        }, function (e) { console.warn('[qm] feed subscription error', e); });
+      },
+      subscribeDoc: function (path, cb) {
+        return fb.onSnapshot(ref(path), function (snap) {
+          cb(snap.exists() ? Object.assign({ id: snap.id }, snap.data()) : null);
+        }, function (e) { console.warn('[qm] party subscription error', e); });
       }
     };
   }
@@ -260,6 +287,7 @@ window.Store = (function () {
       partyId: (state.character && state.character.partyId) || null,
       streak: 0,
       bestStreak: 0,
+      completedThisPeriod: false,
       lastCompletedAt: null
     }, data);
     return backend.addDoc(base().concat('quests'), doc).then(function (id) {
@@ -370,6 +398,29 @@ window.Store = (function () {
     }).catch(function (e) { console.warn('[qm] auto-log failed', eventType, e); });
   }
 
+  /* ---- Party layer (top-level docs, cloud-only) --------------------------- */
+
+  /* Parties live outside the per-character tree, so these take absolute paths
+   * rather than going through base(). Party documents are keyed by their own
+   * invite code, which makes joining a direct read instead of a query — no
+   * composite index, no `where`, just get(parties/CODE). */
+  function isCloud() { return !!backend && backend.kind === 'cloud'; }
+
+  function getParty(partyId) { return backend.getDoc(['parties', partyId]); }
+  function saveParty(partyId, data) { return backend.setDoc(['parties', partyId], data); }
+  function deleteParty(partyId) { return backend.deleteDoc(['parties', partyId]); }
+  function subscribeParty(partyId, cb) { return backend.subscribeDoc(['parties', partyId], cb); }
+
+  function addFeedPost(partyId, data) {
+    var doc = Object.assign({ createdAt: Date.now() }, data);
+    return backend.addDoc(['parties', partyId, 'feed'], doc).then(function (id) {
+      return Object.assign({ id: id }, doc);
+    });
+  }
+  function listFeed(partyId) { return backend.listCollection(['parties', partyId, 'feed']); }
+  function removeFeedPost(partyId, postId) { return backend.deleteDoc(['parties', partyId, 'feed', postId]); }
+  function subscribeFeed(partyId, cb) { return backend.subscribeCollection(['parties', partyId, 'feed'], cb); }
+
   return {
     state: state,
     attach: attach, detach: detach, load: load, loadQuests: loadQuests,
@@ -380,6 +431,9 @@ window.Store = (function () {
     addQuest: addQuest, updateQuest: updateQuest, removeQuest: removeQuest, findQuest: findQuest,
     addTask: addTask, updateTask: updateTask, removeTask: removeTask,
     ensureDefaultLogbook: ensureDefaultLogbook, addLogbook: addLogbook, removeLogbook: removeLogbook,
-    loadEntries: loadEntries, addEntry: addEntry, removeEntry: removeEntry, logEvent: logEvent
+    loadEntries: loadEntries, addEntry: addEntry, removeEntry: removeEntry, logEvent: logEvent,
+    isCloud: isCloud,
+    getParty: getParty, saveParty: saveParty, deleteParty: deleteParty, subscribeParty: subscribeParty,
+    addFeedPost: addFeedPost, listFeed: listFeed, removeFeedPost: removeFeedPost, subscribeFeed: subscribeFeed
   };
 })();

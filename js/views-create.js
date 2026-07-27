@@ -13,13 +13,19 @@ window.ViewCreate = (function () {
       picks: {},             /* stage key -> background object */
       weaponSkill: SEED.weaponSkills[0],
       gearPack: SEED.gearPacks[0],
+      customGear: [],        /* homebrew gear packs added during creation */
+      customSkills: [],      /* extra skills the player defined: {name, rank, iconSlug} */
+      className: null,        /* optional starting calling */
+      classBlurb: '',
+      isEarthClass: false,
+      customClass: false,
       assignment: {},        /* attr key -> score from the array */
       hinges: { pastTrauma: '', looseEnd: '', regret: '' }
     };
 
     var step = 0;
-    var steps = [stepIdentity, stepBackgrounds, stepAttributes, stepFlavor];
-    var stepNames = ['Identity', 'Background', 'Attributes', 'Psychology'];
+    var steps = [stepIdentity, stepBackgrounds, stepAttributes, stepCalling, stepFlavor];
+    var stepNames = ['Identity', 'Background', 'Attributes', 'Calling', 'Psychology'];
 
     var body = el('div.create-body');
     var footer = el('div.create-foot');
@@ -87,7 +93,9 @@ window.ViewCreate = (function () {
       }
       return null;
     }
-    if (step === 3) {
+    /* Step 3 (Calling) is entirely optional — a crawler can pick a class later
+     * in the Build screen, so there is nothing to validate. */
+    if (step === 4) {
       var h = draft.hinges;
       if (!h.pastTrauma || !h.looseEnd || !h.regret) return 'All three hinges are required.';
       return null;
@@ -113,18 +121,52 @@ window.ViewCreate = (function () {
       el('h2', {}, 'Who are you?'),
       field('Crawler name', nameIn, 'The name the announcers will mispronounce.')));
 
+    var gearOptions = SEED.gearPacks.concat(draft.customGear);
+
     host.appendChild(el('section.card', {},
       el('h2', {}, 'What were you wearing?'),
-      el('p.muted', {}, 'You had no warning. Whatever was on your body when the floor opened is what you have.'),
-      el('div.pick-grid', {}, SEED.gearPacks.map(function (pack) {
+      el('p.muted', {}, 'You had no warning. Whatever was on your body when the floor opened is what you have. Not on the list? Make your own.'),
+      el('div.pick-grid', {}, gearOptions.map(function (pack) {
         return el('button.pick' + (draft.gearPack === pack ? '.on' : ''), {
           type: 'button',
           onclick: function () { draft.gearPack = pack; paint(); }
         },
           Icons.node(pack.icon, 'lg'),
-          el('div.pick-name', {}, pack.name),
+          el('div.pick-name', {}, pack.name, pack.custom ? el('span.custom-chip', {}, 'custom') : null),
           el('div.pick-detail', {}, pack.items.join(' · ')));
-      }))));
+      }).concat([
+        el('button.pick.pick-add', {
+          type: 'button',
+          onclick: function () { addCustomGear(draft, paint); }
+        }, el('div.pick-add-plus', {}, '+'), el('div.pick-name', {}, 'Custom pack'))
+      ]))));
+  }
+
+  /* Homebrew gear: a name and a comma-separated list of whatever you decide you
+   * were carrying. It joins the grid and is selected immediately. */
+  function addCustomGear(draft, paint) {
+    var name = textInput('', 'Bike Courier Pack');
+    var items = textInput('', 'Messenger bag, U-lock, energy gel, one glove');
+    openModal({
+      title: 'Custom gear pack',
+      body: el('div', {},
+        field('Pack name', name),
+        field('Items', items, 'Comma-separated. Deliberately useless is on-brand.')),
+      actions: [
+        { label: 'Cancel', kind: 'ghost' },
+        {
+          label: 'Add', kind: 'primary', onClick: function () {
+            if (!name.value.trim()) { toast('Give the pack a name.', 'bad'); return false; }
+            var list = items.value.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+            if (!list.length) list = ['Whatever you had on'];
+            var pack = { name: name.value.trim(), items: list, icon: 'delapouite/backpack', custom: true };
+            draft.customGear.push(pack);
+            draft.gearPack = pack;
+            paint();
+          }
+        }
+      ]
+    });
   }
 
   /* ---- Step 2: backgrounds ------------------------------------------------- */
@@ -161,7 +203,58 @@ window.ViewCreate = (function () {
       el('p.muted', {}, 'Everyone arrives knowing Unarmed Combat at Rank 3. Pick one weapon you also happen to know.'),
       field('Specialised weapon skill', weaponSel)));
 
+    host.appendChild(customSkillCard(draft, paint));
     host.appendChild(previewSkills(draft));
+  }
+
+  /* Homebrew skills: whatever Earth taught you that isn't on the background
+   * lists. They merge into your starting skills at the rank you set, and you can
+   * always add more from the Skills tab later. */
+  function customSkillCard(draft, paint) {
+    return el('section.card', {},
+      el('div.stage-head', {}, el('h3', {}, 'Skills of your own'), el('span.rank-chip', {}, 'Optional')),
+      el('p.muted', {}, 'Add anything the lists missed — Parkour, Coding, Falconry. Duplicates of a granted skill keep the higher rank.'),
+      draft.customSkills.length
+        ? el('div.custom-skill-list', {}, draft.customSkills.map(function (s, i) {
+          return el('div.custom-skill-row', {},
+            Icons.node(s.iconSlug),
+            el('span.custom-skill-name', {}, s.name),
+            el('span.rank-chip', {}, 'R' + s.rank),
+            el('button.icon-btn.subtle', {
+              type: 'button',
+              onclick: function () { draft.customSkills.splice(i, 1); paint(); }
+            }, '✕'));
+        }))
+        : null,
+      el('button.btn.tiny.primary', { type: 'button', onclick: function () { addCustomSkill(draft, paint); } }, '+ Add skill'));
+  }
+
+  function addCustomSkill(draft, paint) {
+    var name = textInput('', 'Parkour');
+    var rank = numInput(1, 0, CONFIG.skillRankMax);
+    var iconSlug = null;
+    var iconCtl = Icons.iconField(null, function (v) { iconSlug = v; });
+    openModal({
+      title: 'Custom skill',
+      body: el('div', {},
+        field('Name', name),
+        el('div.form-row', {}, field('Icon', iconCtl), field('Starting rank', rank, 'Cap ' + CONFIG.skillRankMax))),
+      actions: [
+        { label: 'Cancel', kind: 'ghost' },
+        {
+          label: 'Add', kind: 'primary', onClick: function () {
+            var nm = name.value.trim();
+            if (!nm) { toast('A skill needs a name.', 'bad'); return false; }
+            draft.customSkills.push({
+              name: nm,
+              rank: Math.max(0, Math.min(CONFIG.skillRankMax, parseInt(rank.value, 10) || 0)),
+              iconSlug: iconSlug || SEED.skillIcons[titleCase(nm)] || null
+            });
+            paint();
+          }
+        }
+      ]
+    });
   }
 
   /* Shows exactly what the sheet will end up with, duplicates already merged. */
@@ -183,12 +276,18 @@ window.ViewCreate = (function () {
         byName[name] = { name: name, rank: rank, xp: 0, iconSlug: SEED.skillIcons[name] || null, description: '' };
       }
     }
+    function putSkill(name, rank, iconSlug) {
+      if (!byName[name] || byName[name].rank < rank) {
+        byName[name] = { name: name, rank: rank, xp: 0, iconSlug: iconSlug || SEED.skillIcons[name] || null, description: '' };
+      }
+    }
     SEED.stages.forEach(function (stage) {
       var bg = draft.picks[stage.key];
       if (bg) bg.skills.forEach(function (s) { put(s, stage.rank); });
     });
     SEED.starterSkills.forEach(function (s) { put(s.name, s.rank); });
     put(draft.weaponSkill, 3);
+    (draft.customSkills || []).forEach(function (s) { putSkill(s.name, s.rank, s.iconSlug); });
     return Object.keys(byName).sort().map(function (k) { return byName[k]; });
   }
 
@@ -212,8 +311,6 @@ window.ViewCreate = (function () {
 
     host.appendChild(el('section.card', {}, CONFIG.attributeKeys.map(function (k) {
       var current = draft.assignment[k];
-      var options = pool.slice();
-      if (current !== undefined) options.unshift(current);
 
       return el('div.attr-assign', {},
         el('div.attr-assign-head', {},
@@ -223,16 +320,25 @@ window.ViewCreate = (function () {
           el('div.attr-assign-val', {},
             current === undefined ? el('span.muted', {}, '—')
               : [el('b', {}, String(current)), el('span.mod-chip', {}, signed(CONFIG.scoreToModifier(current)))])),
-        el('div.array-choices', {}, uniq(options).map(function (v) {
-          return el('button.array-btn' + (v === current ? '.on' : ''), {
+        /* Every value in the array is always offered on every attribute — not
+         * just the unassigned ones — so once all five are placed you can still
+         * tap to swap. Offering only the free values used to strand a full
+         * assignment with no way to rearrange it. Tapping the value another
+         * attribute holds swaps the two. */
+        el('div.array-choices', {}, uniq(CONFIG.attributeArray).map(function (v) {
+          var heldBy = CONFIG.attributeKeys.filter(function (o) {
+            return o !== k && draft.assignment[o] === v;
+          })[0];
+          return el('button.array-btn' + (v === current ? '.on' : '') + (heldBy ? '.taken' : ''), {
             type: 'button',
+            title: heldBy ? 'Swap with ' + CONFIG.attributeNames[heldBy] : '',
             onclick: function () {
               /* Assigning a value another attribute holds swaps them, which is
                * how people actually want to rearrange five numbers. */
               CONFIG.attributeKeys.forEach(function (other) {
                 if (other !== k && draft.assignment[other] === v) {
-                  draft.assignment[other] = current;
                   if (current === undefined) delete draft.assignment[other];
+                  else draft.assignment[other] = current;
                 }
               });
               draft.assignment[k] = v;
@@ -275,7 +381,82 @@ window.ViewCreate = (function () {
       el('div.derived-note', {}, note));
   }
 
-  /* ---- Step 4: hinges ------------------------------------------------------- */
+  /* ---- Step 4: calling (optional class) ------------------------------------- */
+
+  /* The book puts races and classes behind Floor 3 and the full point-buy lives
+   * in the Build screen. This is the light on-ramp: pick a starting class (or
+   * invent one) now if you already know what you are, or skip it and decide
+   * later. Earth-gated classes are intentionally not offered here — they need an
+   * Earth-native ancestry, which is a Build-screen decision. */
+  function stepCalling(host, draft, paint) {
+    host.appendChild(el('section.card', {},
+      el('h2', {}, 'What are you becoming?'),
+      el('p.muted', {}, 'Optional. Choose a starting class, write your own, or skip it and pick one later in the Build screen. Traits and point-buy always live there.')));
+
+    var options = [{ name: null, blurb: 'Stay classless for now — decide in the Build screen once you are on your feet.', decideLater: true }]
+      .concat(BUILD.classes.filter(function (c) { return !c.isEarth; }));
+
+    host.appendChild(el('section.card', {},
+      el('div.pick-grid.compact', {}, options.map(function (c) {
+        var isDecideLater = c.decideLater;
+        var on = isDecideLater
+          ? (!draft.customClass && !draft.className)
+          : (!draft.customClass && draft.className === c.name);
+        return el('button.pick' + (on ? '.on' : ''), {
+          type: 'button',
+          onclick: function () {
+            draft.customClass = false;
+            draft.className = c.name;
+            draft.classBlurb = c.blurb || '';
+            draft.isEarthClass = false;
+            paint();
+          }
+        },
+          isDecideLater ? el('div.pick-add-plus', {}, '—') : Icons.node(c.iconSlug, 'lg'),
+          el('div.pick-name', {}, isDecideLater ? 'Decide later' : c.name),
+          el('div.pick-detail', {}, c.blurb));
+      }))));
+
+    var customOn = draft.customClass;
+    host.appendChild(el('section.card', {},
+      el('div.stage-head', {}, el('h3', {}, 'Homebrew a class'), el('span.rank-chip', {}, 'Custom')),
+      el('p.muted', {}, 'Not on the list? Name your own calling. It has no preset traits — you can still buy race and detriment traits in the Build screen.'),
+      el('button.pick' + (customOn ? '.on' : '') + '.pick-wide', {
+        type: 'button',
+        onclick: function () { addCustomClass(draft, paint); }
+      },
+        Icons.node('lorc/spikes-full', 'lg'),
+        el('div', {},
+          el('div.pick-name', {}, customOn && draft.className ? draft.className : 'Define a custom class',
+            customOn ? el('span.custom-chip', {}, 'custom') : null),
+          el('div.pick-detail', {}, customOn && draft.classBlurb ? draft.classBlurb : 'Tap to name your own.')))));
+  }
+
+  function addCustomClass(draft, paint) {
+    var name = textInput(draft.customClass ? draft.className : '', 'Storm Chaser');
+    var blurb = textArea(draft.customClass ? draft.classBlurb : '', 'One line on what this calling is.', 2);
+    openModal({
+      title: 'Custom class',
+      body: el('div', {},
+        field('Class name', name),
+        field('Description', blurb)),
+      actions: [
+        { label: 'Cancel', kind: 'ghost' },
+        {
+          label: 'Use this class', kind: 'primary', onClick: function () {
+            if (!name.value.trim()) { toast('Give the class a name.', 'bad'); return false; }
+            draft.customClass = true;
+            draft.className = name.value.trim();
+            draft.classBlurb = blurb.value.trim();
+            draft.isEarthClass = false;
+            paint();
+          }
+        }
+      ]
+    });
+  }
+
+  /* ---- Step 5: hinges ------------------------------------------------------- */
 
   function stepFlavor(host, draft, paint) {
     host.appendChild(el('section.card', {},
@@ -288,12 +469,18 @@ window.ViewCreate = (function () {
       { key: 'regret', label: 'Regret' }
     ].forEach(function (h) {
       var custom = textInput(draft.hinges[h.key], 'Or write your own…');
+      custom.setAttribute('data-focus-key', 'hinge-' + h.key);
       custom.addEventListener('input', function () {
         draft.hinges[h.key] = custom.value;
-        $$('.hinge-opt', host).forEach(function (b) { b.classList.remove('on'); });
-        var problem = validate(3, draft);
+        /* Only clear the presets of THIS hinge — the old code scoped to `host`
+         * and wiped the highlight on all three groups at once. */
+        var group = custom.closest('section.card');
+        $$('.hinge-opt', group || host).forEach(function (b) { b.classList.remove('on'); });
+        var problem = validate(4, draft);
         var btn = $('.create-foot .btn.primary');
         if (btn) btn.disabled = !!problem;
+        var msg = $('.create-foot .create-problem');
+        if (msg) msg.textContent = problem || '';
       });
 
       host.appendChild(el('section.card', {},
@@ -343,8 +530,9 @@ window.ViewCreate = (function () {
       }, {}),
       gearPack: draft.gearPack.name,
       raceName: null,
-      className: null,
-      isEarthClass: false,
+      className: draft.className || null,
+      classBlurb: draft.classBlurb || '',
+      isEarthClass: !!draft.isEarthClass,
       resources: {
         currentHealth: d.maxHealth,
         currentMana: d.maxMana,

@@ -255,11 +255,19 @@ window.Engine = (function () {
     }
     if (cadence === 'monthly') {
       var day = opts.resetDayOfMonth || 1;
-      var m = new Date(d.getFullYear(), d.getMonth(), day, 0, 0, 0, 0);
-      if (m.getTime() <= d.getTime()) m = new Date(d.getFullYear(), d.getMonth() + 1, day, 0, 0, 0, 0);
-      /* Clamp a day-31 quest into a short month rather than overflowing it. */
-      if (m.getDate() !== day) m = new Date(m.getFullYear(), m.getMonth(), 0, 0, 0, 0, 0);
-      return m.getTime();
+      /* Walk forward month by month, clamping the target day into each month's
+       * real length, and return the first boundary strictly after `from`. The
+       * old version clamped *after* its future-check, so on the last day of a
+       * short month a day-31 quest produced a timestamp in the past and reset on
+       * every load — this can't, because the clamp happens before the compare. */
+      for (var addM = 0; addM < 24; addM++) {
+        var y = d.getFullYear();
+        var mo = d.getMonth() + addM;                 /* Date normalises month overflow */
+        var daysInMonth = new Date(y, mo + 1, 0).getDate();
+        var cand = new Date(y, mo, Math.min(day, daysInMonth), 0, 0, 0, 0);
+        if (cand.getTime() > d.getTime()) return cand.getTime();
+      }
+      return null;
     }
     return null; /* one-time quests never reset */
   }

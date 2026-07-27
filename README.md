@@ -40,7 +40,17 @@ Those config values are public by design — a web client can't hide them. Secur
 
 ### Deploying to GitHub Pages
 
-Push to a repo, then **Settings → Pages → Deploy from branch → main → / (root)**. No build step, nothing to configure. Bump the `?v=` query strings in `index.html` and `CONFIG.build` when you ship a change, or browsers will serve stale JS.
+Repo: [oldgodsslumber/questmaster](https://github.com/oldgodsslumber/questmaster)
+
+**Settings → Pages → Deploy from branch → `main` → `/ (root)`.** No build step, nothing to configure. It lands at:
+
+```
+https://oldgodsslumber.github.io/questmaster/
+```
+
+Then add **`oldgodsslumber.github.io`** to **Firebase → Authentication → Settings → Authorized domains**, or Google sign-in will fail on the deployed site with `auth/unauthorized-domain` while working fine on localhost.
+
+Bump the `?v=` query strings in `index.html` and `CONFIG.build` when you ship a change, or browsers will serve stale JS. They're the same string — one find-and-replace.
 
 ---
 

@@ -96,16 +96,71 @@ window.ViewFeed = (function () {
           ? el('label.feed-target', {}, el('span.muted.small', {}, 'Post to'), targetSel)
           : el('span.muted.small', {}, 'Posting to your friends feed.'),
         el('button.btn.primary', { onclick: send }, 'Post')),
-      /* Post a buff/debuff or achievement straight to the feed — creating one
-       * here also announces it to the destination selected above. */
+      /* Post a buff/debuff, achievement, kit item, or stat straight to the feed —
+       * each carries its own game-icon and announces to the destination above. */
       el('div.feed-quickpost', {},
         el('span.muted.small', {}, 'Or post a:'),
         el('button.btn.tiny.ghost', { onclick: function () { ViewStatuses.newStatus(target()); } }, '✨ Buff / Debuff'),
-        el('button.btn.tiny.ghost', { onclick: function () { ViewStatuses.newAchievement(target()); } }, '🎖️ Achievement')));
+        el('button.btn.tiny.ghost', { onclick: function () { ViewStatuses.newAchievement(target()); } }, '🎖️ Achievement'),
+        el('button.btn.tiny.ghost', { onclick: function () { shareItem(target()); } }, '🎒 Item'),
+        el('button.btn.tiny.ghost', { onclick: function () { shareStat(target()); } }, '📊 Stat')));
   }
 
-  var KIND_ICON = { 'quest-complete': '🏆', 'achievement': '🎖️', 'status': '✨', 'journal': '📖' };
-  var SYSTEM_KIND = { 'quest-complete': 1, 'achievement': 1, 'status': 1 };
+  /* ---- Sharing a kit item or a stat to the feed --------------------------- */
+
+  /* Push one line to a destination, tagged with the entity's game-icon so the
+   * feed avatar shows the item/stat's own art rather than a generic glyph. */
+  function postEntity(body, kind, iconSlug, to) {
+    if (!to) { toast('Pick where to post.', 'bad'); return; }
+    Party.post(body, kind, { iconSlug: iconSlug || null }, to)
+      .then(function () { toast('Posted.'); })
+      .catch(function (e) { toast(e.message || 'Could not post.', 'bad'); });
+  }
+
+  /* A tap-to-pick modal: each row is an entity with its icon; picking it posts. */
+  function sharePicker(title, list, subOf, bodyOf, kind, to) {
+    if (!list || !list.length) { toast('Nothing to share here yet.', 'bad'); return; }
+    var close;
+    var rows = list.map(function (ent) {
+      var sub = subOf ? subOf(ent) : null;
+      return el('button.share-pick-row', {
+        type: 'button',
+        onclick: function () {
+          close();
+          var who = (Store.state.character && Store.state.character.name) || 'A crawler';
+          postEntity(bodyOf(who, ent), kind, ent.iconSlug, to);
+        }
+      },
+        el('span.share-pick-icon', {}, Icons.node(ent.iconSlug)),
+        el('span.share-pick-name', {}, ent.name || 'Unnamed'),
+        sub ? el('span.muted.small.share-pick-sub', {}, sub) : null);
+    });
+    close = openModal({
+      title: title,
+      body: el('div.share-pick', {}, rows),
+      actions: [{ label: 'Cancel', kind: 'ghost' }]
+    });
+  }
+
+  function shareItem(to) {
+    var items = (Store.state.equipment || []).concat(Store.state.items || []);
+    sharePicker('Share an item', items,
+      function (e) { return e.slot ? capitalize(e.slot.replace(/([A-Z])/g, ' $1')) : (e.rarity ? capitalize(e.rarity) : null); },
+      function (who, e) { return who + ' shows off "' + (e.name || 'an item') + '".'; },
+      'item', to);
+  }
+
+  function shareStat(to) {
+    sharePicker('Share a stat', Store.state.skills || [],
+      function (s) { return 'Rank ' + (s.rank || 1); },
+      function (who, s) { return who + "'s " + (s.name || 'a stat') + ' reached rank ' + (s.rank || 1) + '.'; },
+      'skill', to);
+  }
+
+  function capitalize(s) { s = String(s || ''); return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+
+  var KIND_ICON = { 'quest-complete': '🏆', 'achievement': '🎖️', 'status': '✨', 'journal': '📖', 'item': '🎒', 'skill': '📊' };
+  var SYSTEM_KIND = { 'quest-complete': 1, 'achievement': 1, 'status': 1, 'item': 1, 'skill': 1 };
 
   function postRow(p) {
     var mine = p.authorUid === Party.myUid();

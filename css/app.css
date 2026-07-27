@@ -947,3 +947,12 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 
 /* Quick-post buttons under the feed composer (buff/debuff / achievement). */
 .feed-quickpost { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+
+/* Tap-to-pick list for sharing a kit item or a stat to the feed. */
+.share-pick { display: flex; flex-direction: column; gap: 4px; max-height: 60vh; overflow-y: auto; }
+.share-pick-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 9px 10px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line-2); color: var(--ink); cursor: pointer; }
+.share-pick-row:hover { border-color: var(--accent); }
+.share-pick-icon { display: inline-flex; color: var(--accent); }
+.share-pick-icon .gi { width: 22px; height: 22px; color: inherit; vertical-align: 0; }
+.share-pick-name { font-weight: 600; font-size: .9rem; }
+.share-pick-sub { margin-left: auto; }

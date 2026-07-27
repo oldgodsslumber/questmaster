@@ -159,7 +159,8 @@ window.ViewFeed = (function () {
 
   function capitalize(s) { s = String(s || ''); return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 
-  var KIND_ICON = { 'quest-complete': '🏆', 'achievement': '🎖️', 'status': '✨', 'journal': '📖', 'item': '🎒', 'skill': '📊' };
+  var KIND_ICON = { 'quest-complete': '🏆', 'achievement': '🎖️', 'status': '✨', 'journal': '📖', 'item': '🎒', 'skill': '📊',
+    'world-system': '🛠️', 'world-ai': '🤖', 'world-quest': '⚔️' };
   var SYSTEM_KIND = { 'quest-complete': 1, 'achievement': 1, 'status': 1, 'item': 1, 'skill': 1 };
 
   function postRow(p) {
@@ -174,7 +175,13 @@ window.ViewFeed = (function () {
       ? el('div.feed-avatar.feed-avatar-icon', {}, Icons.node(p.iconSlug))
       : el('div.feed-avatar', {}, KIND_ICON[p.kind] || initial);
 
-    return el('div.feed-post' + (isSystem ? '.auto' : ''), {},
+    /* A global admin broadcast is colour-coded by type and can't be deleted from
+     * the feed (the admin retires it from the World panel), so suppress the ✕. */
+    var isWorld = !!p._world;
+    var worldCls = isWorld && window.ViewAdmin ? ' ' + ViewAdmin.worldClass(p.kind) : '';
+    var canDelete = mine && !isWorld;
+
+    return el('div.feed-post' + (isSystem ? '.auto' : '') + worldCls, {},
       avatar,
       el('div.feed-body-wrap', {},
         el('div.feed-head', {},
@@ -182,11 +189,30 @@ window.ViewFeed = (function () {
           p.authorLevel ? el('span.muted.small', {}, 'Lv ' + p.authorLevel) : null,
           p._partyName ? el('span.feed-party-tag', {}, p._partyName) : null,
           el('span.muted.small.feed-time', {}, fmtDate(p.createdAt)),
-          mine ? el('button.icon-btn.subtle', {
+          canDelete ? el('button.icon-btn.subtle', {
             title: 'Delete post',
             onclick: function () { Party.removePost(p).catch(function () {}); }
           }, '✕') : null),
-        el('div.feed-text', {}, p.body)));
+        p.title && isWorld ? el('div.feed-world-title', {}, p.title) : null,
+        el('div.feed-text', {}, p.body),
+        (p.kind === 'world-quest') ? worldQuestAction(p) : null));
+  }
+
+  /* An Accept button on a World Quest post — copies the quest into the crawler's
+   * own log via Party.acceptWorldQuest; shows an accepted state once they have. */
+  function worldQuestAction(p) {
+    var accepted = window.Party && Party.hasAcceptedWorldQuest && Party.hasAcceptedWorldQuest(p.id);
+    if (accepted) return el('div.feed-wq-actions', {}, el('span.wc-accepted', {}, '✓ Accepted — in your quest log'));
+    return el('div.feed-wq-actions', {},
+      p.xpReward ? el('span.muted.small', {}, '+' + p.xpReward + ' XP') : null,
+      el('button.btn.tiny.primary', {
+        onclick: function (e) {
+          e.target.disabled = true;
+          Party.acceptWorldQuest(p)
+            .then(function () { toast('World Quest added to your log.'); App.render(); })
+            .catch(function (err) { e.target.disabled = false; toast(err.message || 'Could not accept.', 'bad'); });
+        }
+      }, 'Accept World Quest'));
   }
 
   return { render: render };

@@ -31,6 +31,8 @@ window.Party = (function () {
   var friendUnsubs = {};   /* uid -> fn */
   var walls = {};          /* uid -> [wall posts]: mine + each friend I follow */
   var wallUnsubs = {};     /* uid -> fn */
+  var worldPosts = [];     /* global admin broadcasts (system / AI / world quest) */
+  var worldUnsub = null;
   var listeners = [];
 
   /* ---- Availability & getters -------------------------------------------- */
@@ -106,15 +108,23 @@ window.Party = (function () {
     ids.forEach(connectParty);
     watchWall(myUid());                            /* my own wall */
     (c.friendUids || []).forEach(function (uid) { watchFriend(uid); watchWall(uid); });
+    watchWorld();                                  /* global admin broadcasts */
     emit();
     return Promise.resolve(null);
+  }
+
+  /* Every signed-in crawler follows the one global broadcast stream. */
+  function watchWorld() {
+    if (worldUnsub) return;
+    worldUnsub = Store.subscribeWorld(function (posts) { worldPosts = posts || []; emit(); });
   }
 
   function teardown() {
     Object.keys(unsubs).forEach(function (code) { dropSubs(code); });
     Object.keys(friendUnsubs).forEach(function (uid) { try { friendUnsubs[uid](); } catch (e) {} });
     Object.keys(wallUnsubs).forEach(function (uid) { try { wallUnsubs[uid](); } catch (e) {} });
-    parties = {}; feeds = {}; unsubs = {}; friendCards = {}; friendUnsubs = {}; walls = {}; wallUnsubs = {};
+    if (worldUnsub) { try { worldUnsub(); } catch (e) {} worldUnsub = null; }
+    parties = {}; feeds = {}; unsubs = {}; friendCards = {}; friendUnsubs = {}; walls = {}; wallUnsubs = {}; worldPosts = [];
   }
 
   function watchWall(uid) {
@@ -290,6 +300,11 @@ window.Party = (function () {
           out.push(Object.assign({ _wallUid: uid, _partyName: 'Friends' }, p));
         });
       });
+      /* Global admin broadcasts show in the everything view and the Friends
+       * view — they're addressed to the whole crawl, not any one party. */
+      worldPosts.forEach(function (p) {
+        out.push(Object.assign({ _world: true, _partyName: 'World' }, p));
+      });
     }
     if (filter !== 'friends') {
       Object.keys(feeds).forEach(function (code) {
@@ -398,6 +413,46 @@ window.Party = (function () {
     return Store.saveCharacter({ friendUids: list }).then(function () { emit(); });
   }
 
+  /* ---- World broadcasts (read side) -------------------------------------- */
+
+  function worldFeed() { return worldPosts.slice(); }
+
+  /* Has this crawler already added the given World Quest to their own log? We
+   * stamp the origin id on the copied quest so the feed can show "Accepted". */
+  function hasAcceptedWorldQuest(worldId) {
+    return (Store.state.quests || []).some(function (q) { return q.worldQuestId === worldId; });
+  }
+
+  /* Opt in to a World Quest: copy the admin's template into this crawler's own
+   * quests subcollection, where the normal quest engine tracks and completes it.
+   * Idempotent — a second tap is a no-op that just resolves. */
+  function acceptWorldQuest(wp) {
+    if (!available()) return Promise.reject(new Error('Sign in to accept World Quests.'));
+    if (!wp || wp.kind !== 'world-quest') return Promise.reject(new Error('Not a World Quest.'));
+    if (hasAcceptedWorldQuest(wp.id)) return Promise.resolve(null);
+
+    var tasks = (wp.tasks && wp.tasks.length ? wp.tasks : [wp.questTitle || wp.title || 'Complete the World Quest']);
+    var patch = {
+      title: wp.questTitle || wp.title || 'World Quest',
+      description: wp.body || '',
+      cadence: 'oneoff',
+      visibility: 'private',
+      bonusXp: wp.xpReward || 0,
+      iconSlug: wp.iconSlug || null,
+      worldQuestId: wp.id
+    };
+    patch.nextResetAt = (window.Engine && Engine.nextResetAt) ? Engine.nextResetAt('oneoff', Date.now(), patch) : null;
+    return Store.addQuest(patch).then(function (quest) {
+      return Promise.all(tasks.map(function (t, i) {
+        return Store.addTask(quest.id, {
+          title: String(t),
+          xpReward: wp.xpReward ? Math.round(wp.xpReward / tasks.length) : CONFIG.xpPerTaskDefault,
+          order: i
+        });
+      })).then(function () { emit(); return quest; });
+    });
+  }
+
   return {
     available: available, myUid: myUid,
     onChange: onChange, attach: attach, detach: detach,
@@ -408,6 +463,8 @@ window.Party = (function () {
     /* feed */
     combinedFeed: combinedFeed, post: post, removePost: removePost, autoPost: autoPost,
     /* friends */
-    myFriendCode: myFriendCode, friends: friends, addFriendByCode: addFriendByCode, removeFriend: removeFriend
+    myFriendCode: myFriendCode, friends: friends, addFriendByCode: addFriendByCode, removeFriend: removeFriend,
+    /* world broadcasts */
+    worldFeed: worldFeed, acceptWorldQuest: acceptWorldQuest, hasAcceptedWorldQuest: hasAcceptedWorldQuest
   };
 })();

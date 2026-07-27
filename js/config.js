@@ -6,7 +6,15 @@
  */
 window.CONFIG = {
 
-  build: '20260727r',
+  build: '20260727s',
+
+  /* ---- Admin ----------------------------------------------------------- */
+
+  /* Google accounts allowed to post world broadcasts (system / AI-world
+   * messages and World Quests). Gating is enforced twice: the client hides the
+   * admin tab for everyone else, and firestore.rules refuses writes to /world
+   * unless the auth token's email is on this list. Lower-cased at compare time. */
+  adminEmails: ['thatwalshguy@gmail.com'],
 
   /* ---- Attributes ------------------------------------------------------ */
 

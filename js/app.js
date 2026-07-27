@@ -19,15 +19,26 @@ window.App = (function () {
     '#/build': { label: 'Build', icon: '🧬', view: function () { return ViewBuild; } },
     '#/party': { label: 'Party', icon: '👥', view: function () { return ViewParty; } },
     '#/feed': { label: 'Feed', icon: '📰', view: function () { return ViewFeed; } },
-    '#/journal': { label: 'Journal', icon: '📖', view: function () { return ViewJournal; } }
+    '#/journal': { label: 'Journal', icon: '📖', view: function () { return ViewJournal; } },
+    '#/admin': { label: 'World', icon: '🌐', view: function () { return ViewAdmin; } }
   };
   /* Stats (#/skills), Status (#/statuses) and Build (#/build) are intentionally
    * NOT in the nav — they're reached from the Sheet (Stats via "Manage", Build
    * via "Race & Class", and buffs/achievements are embedded straight into the
-   * Sheet and the Feed). Their routes stay registered so those links still work. */
+   * Sheet and the Feed). Their routes stay registered so those links still work.
+   * #/admin is nav-gated too: only an admin (see isAdmin) ever sees the tab. */
   var NAV_ORDER = ['#/sheet', '#/quests', '#/inventory', '#/party', '#/feed', '#/journal'];
 
   var stage = 'boot';    /* boot | signin | create | app */
+
+  /* The signed-in Google email, latched on auth so isAdmin() can gate the admin
+   * tab. Null in local mode, so local play is never treated as admin. */
+  var authEmail = null;
+  function isAdmin() {
+    if (!authEmail) return false;
+    var list = (CONFIG.adminEmails || []).map(function (e) { return String(e).toLowerCase(); });
+    return list.indexOf(String(authEmail).toLowerCase()) !== -1;
+  }
 
   /* The render loop repaints the whole view on every mutation. Without help,
    * that throws away scroll position and keyboard focus — so tapping a checkbox
@@ -49,7 +60,7 @@ window.App = (function () {
      * scroll position on an unrelated view. */
     if (window.Party) {
       Party.onChange(function () {
-        if (stage === 'app' && (location.hash === '#/party' || location.hash === '#/feed')) render();
+        if (stage === 'app' && (location.hash === '#/party' || location.hash === '#/feed' || location.hash === '#/admin')) render();
       });
     }
 
@@ -83,12 +94,14 @@ window.App = (function () {
 
   function onAuth(user) {
     if (!user) {
+      authEmail = null;
       if (window.Party) Party.detach();
       Store.detach();
       stage = 'signin';
       render();
       return;
     }
+    authEmail = user.email || null;
     enter(user.uid, window.FirebaseCtx, user.displayName);
   }
 
@@ -231,7 +244,11 @@ window.App = (function () {
         ? el('span.local-chip', { title: 'Firebase is not configured — data lives in this browser only.' }, 'Local')
         : el('button.icon-btn.subtle', { title: 'Sign out', onclick: signOut }, '⏻')));
 
-    nav.appendChild(el('div.nav-links', {}, NAV_ORDER.map(function (hash) {
+    /* Admins get one extra tab at the end; nobody else sees it in the nav (and
+     * the route itself re-checks isAdmin, so a hand-typed #/admin gets nothing). */
+    var order = isAdmin() ? NAV_ORDER.concat(['#/admin']) : NAV_ORDER;
+
+    nav.appendChild(el('div.nav-links', {}, order.map(function (hash) {
       var r = ROUTES[hash];
       var on = (location.hash || '#/quests') === hash;
       return el('a.nav-link' + (on ? '.on' : ''), { href: hash },
@@ -290,7 +307,7 @@ window.App = (function () {
     if (stage === 'app') render();
   }
 
-  return { start: start, render: render, go: go, afterCreate: afterCreate, enter: enter };
+  return { start: start, render: render, go: go, afterCreate: afterCreate, enter: enter, isAdmin: isAdmin };
 })();
 
 document.addEventListener('DOMContentLoaded', function () { App.start(); });

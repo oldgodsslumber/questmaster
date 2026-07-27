@@ -956,3 +956,40 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 .share-pick-icon .gi { width: 22px; height: 22px; color: inherit; vertical-align: 0; }
 .share-pick-name { font-weight: 600; font-size: .9rem; }
 .share-pick-sub { margin-left: auto; }
+
+/* ---- World broadcasts (system / AI / world quest) ----------------------- */
+/* Each type owns a colour, shared by the feed post, the admin list, and the
+   admin composer preview via the --wc custom property. */
+.wc-system { --wc: #ff5470; }   /* System — alert red      */
+.wc-ai     { --wc: #b57bff; }   /* AI world — arcane violet */
+.wc-quest  { --wc: #ffb63a; }   /* World Quest — quest gold */
+
+.feed-post.wc-system, .wc-item.wc-system, .wc-preview.wc-system { background: rgba(255, 84, 112, .10); }
+.feed-post.wc-ai,     .wc-item.wc-ai,     .wc-preview.wc-ai     { background: rgba(181, 123, 255, .10); }
+.feed-post.wc-quest,  .wc-item.wc-quest,  .wc-preview.wc-quest  { background: rgba(255, 182, 58, .12); }
+
+.feed-post.wc-system, .feed-post.wc-ai, .feed-post.wc-quest {
+  border-left: 3px solid var(--wc); border-radius: 10px; padding: 10px 10px 10px 9px;
+}
+.feed-post.wc-system .feed-avatar, .feed-post.wc-ai .feed-avatar, .feed-post.wc-quest .feed-avatar {
+  color: var(--wc); border-color: var(--wc);
+}
+.feed-world-title { font-weight: 700; color: var(--wc); margin-bottom: 2px; }
+.feed-wq-actions { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.wc-accepted { color: var(--wc); font-weight: 600; font-size: .82rem; }
+
+/* Admin panel */
+.admin-title { font-size: 1.15rem; margin: 0 0 4px; }
+.admin-subtitle { font-size: .95rem; margin: 0 0 8px; }
+.admin-quest-fields { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+.wc-avatar { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; flex: 0 0 30px; color: var(--wc, var(--accent)); font-size: 1.1rem; }
+.wc-avatar .gi { width: 22px; height: 22px; color: inherit; vertical-align: 0; }
+.wc-preview { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 10px; border-left: 3px solid var(--wc, var(--line-2)); }
+.wc-preview-text { font-size: .85rem; color: var(--ink-2); }
+.wc-list { display: flex; flex-direction: column; gap: 8px; }
+.wc-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px; border-radius: 10px; border-left: 3px solid var(--wc); }
+.wc-item-body { flex: 1; min-width: 0; }
+.wc-item-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.wc-kind { font-weight: 700; color: var(--wc); font-size: .74rem; text-transform: uppercase; letter-spacing: .03em; }
+.wc-item-title { font-weight: 600; font-size: .9rem; }
+.wc-item-text { font-size: .86rem; color: var(--ink-2); margin-top: 3px; white-space: pre-wrap; word-break: break-word; }

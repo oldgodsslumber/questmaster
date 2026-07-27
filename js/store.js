@@ -448,6 +448,18 @@ window.Store = (function () {
   function removeWallPost(cuid, postId) { return backend.deleteDoc(['crawlers', cuid, 'feed', postId]); }
   function subscribeWall(cuid, cb) { return backend.subscribeCollection(['crawlers', cuid, 'feed'], cb); }
 
+  /* World broadcasts — a single top-level 'world' collection every signed-in
+   * crawler can read, but only an admin (enforced in firestore.rules by email)
+   * may write. System messages, AI-world messages, and World Quests all live
+   * here, distinguished by their `kind`. This is the one truly global stream. */
+  function addWorldPost(data) {
+    var doc = Object.assign({ createdAt: Date.now() }, data);
+    return backend.addDoc(['world'], doc).then(function (id) { return Object.assign({ id: id }, doc); });
+  }
+  function removeWorldPost(postId) { return backend.deleteDoc(['world', postId]); }
+  function listWorld() { return backend.listCollection(['world']); }
+  function subscribeWorld(cb) { return backend.subscribeCollection(['world'], cb); }
+
   return {
     state: state,
     attach: attach, detach: detach, load: load, loadQuests: loadQuests,
@@ -464,6 +476,7 @@ window.Store = (function () {
     addFeedPost: addFeedPost, listFeed: listFeed, removeFeedPost: removeFeedPost, subscribeFeed: subscribeFeed,
     getCrawler: getCrawler, saveCrawler: saveCrawler, subscribeCrawler: subscribeCrawler,
     getCrawlerCode: getCrawlerCode, saveCrawlerCode: saveCrawlerCode,
-    addWallPost: addWallPost, removeWallPost: removeWallPost, subscribeWall: subscribeWall
+    addWallPost: addWallPost, removeWallPost: removeWallPost, subscribeWall: subscribeWall,
+    addWorldPost: addWorldPost, removeWorldPost: removeWorldPost, listWorld: listWorld, subscribeWorld: subscribeWorld
   };
 })();

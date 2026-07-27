@@ -171,6 +171,21 @@ service cloud.firestore {
       }
     }
 
+    /* Global world broadcasts — the one stream every crawler reads and only an
+     * admin may write. System messages, AI-world messages, and World Quests all
+     * live here. Admin is decided by the Google account's verified email, so
+     * there is no admin flag to spoof: the token carries it, signed by Google.
+     * Keep this list in sync with CONFIG.adminEmails on the client. */
+    function isAdmin() {
+      return signedIn()
+        && request.auth.token.email_verified == true
+        && request.auth.token.email in ['thatwalshguy@gmail.com'];
+    }
+    match /world/{postId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
     /* Friend-code index: CODE -> { uid }. Lets "add by friend code" resolve to a
      * uid with a single direct read (no query). You may only point a code at
      * yourself, so nobody can hijack someone else's code. */

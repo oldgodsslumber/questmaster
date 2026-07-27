@@ -75,6 +75,82 @@ function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
+/* ---- Markdown ----------------------------------------------------------- */
+
+/* A deliberately small, safe Markdown renderer for journal entries and status
+ * descriptions. Everything is HTML-escaped first and only a whitelist of tags
+ * is ever emitted, so there is no innerHTML injection path even though the
+ * content is the user's own. Supports headings, bold, italic, inline code,
+ * fenced code blocks, blockquotes, bullet and numbered lists, and
+ * [text](url) links (http/https/mailto only). */
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+function mdInline(escaped) {
+  return escaped
+    .replace(/`([^`]+)`/g, function (_, c) { return '<code>' + c + '</code>'; })
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/__([^_]+)__/g, '<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+    .replace(/(^|[^\w])_([^_]+)_(?=$|[^\w])/g, '$1<em>$2</em>')
+    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, function (_, t, url) {
+      var safe = /^(https?:|mailto:)/i.test(url) ? url : '#';
+      return '<a href="' + escapeHtml(safe) + '" target="_blank" rel="noopener noreferrer">' + t + '</a>';
+    });
+}
+
+function renderMarkdown(src) {
+  var host = el('div.md');
+  var lines = String(src == null ? '' : src).replace(/\r\n?/g, '\n').split('\n');
+  var html = [];
+  var i = 0;
+  var BLOCK = /^(#{1,6})\s|^>\s?|^\s*[-*+]\s+|^\s*\d+\.\s+|^```/;
+  function line(s) { return mdInline(escapeHtml(s)); }
+
+  while (i < lines.length) {
+    var ln = lines[i];
+
+    if (/^```/.test(ln)) {                       /* fenced code */
+      var buf = []; i++;
+      while (i < lines.length && !/^```/.test(lines[i])) { buf.push(lines[i]); i++; }
+      i++;
+      html.push('<pre><code>' + escapeHtml(buf.join('\n')) + '</code></pre>');
+      continue;
+    }
+    var h = ln.match(/^(#{1,6})\s+(.*)$/);       /* heading */
+    if (h) { var lv = h[1].length; html.push('<h' + lv + '>' + line(h[2]) + '</h' + lv + '>'); i++; continue; }
+    if (/^>\s?/.test(ln)) {                       /* blockquote */
+      var q = [];
+      while (i < lines.length && /^>\s?/.test(lines[i])) { q.push(lines[i].replace(/^>\s?/, '')); i++; }
+      html.push('<blockquote>' + q.map(line).join('<br>') + '</blockquote>');
+      continue;
+    }
+    if (/^\s*[-*+]\s+/.test(ln)) {                /* unordered list */
+      var u = [];
+      while (i < lines.length && /^\s*[-*+]\s+/.test(lines[i])) { u.push(lines[i].replace(/^\s*[-*+]\s+/, '')); i++; }
+      html.push('<ul>' + u.map(function (x) { return '<li>' + line(x) + '</li>'; }).join('') + '</ul>');
+      continue;
+    }
+    if (/^\s*\d+\.\s+/.test(ln)) {                /* ordered list */
+      var o = [];
+      while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) { o.push(lines[i].replace(/^\s*\d+\.\s+/, '')); i++; }
+      html.push('<ol>' + o.map(function (x) { return '<li>' + line(x) + '</li>'; }).join('') + '</ol>');
+      continue;
+    }
+    if (/^\s*$/.test(ln)) { i++; continue; }      /* blank */
+
+    var p = [];                                   /* paragraph */
+    while (i < lines.length && !/^\s*$/.test(lines[i]) && !BLOCK.test(lines[i])) { p.push(lines[i]); i++; }
+    html.push('<p>' + p.map(line).join('<br>') + '</p>');
+  }
+
+  host.innerHTML = html.join('');
+  return host;
+}
+
 /* ---- Chrome: toast, modal, confirm -------------------------------------- */
 
 function toast(msg, kind) {

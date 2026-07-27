@@ -93,7 +93,9 @@ window.ViewJournal = (function () {
   /* ---- Composer ------------------------------------------------------------------ */
 
   function composer() {
-    var area = textArea('', 'What happened?', 3);
+    var titleIn = textInput('', 'Title (optional)');
+    titleIn.setAttribute('data-focus-key', 'journal-title');
+    var area = textArea('', 'What happened? Markdown works here.', 3);
     area.setAttribute('data-focus-key', 'journal-composer');
     var usedTemplate = null;
     var canShare = window.Party && Party.available() && Party.inParty();
@@ -103,10 +105,16 @@ window.ViewJournal = (function () {
       return el('button.starter', {
         onclick: function () {
           usedTemplate = s;
-          area.value = s;
+          /* Insert the starter with its fixed lead-in already bold, so a
+           * started entry reads as "**Discovered a new area:** the Crypt". The
+           * ** markers are real Markdown, so the bold survives into the entry. */
+          var blank = s.indexOf('___');
+          var prefix = (blank !== -1 ? s.slice(0, blank) : s).replace(/\s+$/, '');
+          var tail = blank !== -1 ? s.slice(blank) : '';
+          area.value = '**' + prefix + '** ' + tail;
           area.focus();
           /* Drop the caret on the blank so you can just start typing. */
-          var i = s.indexOf('___');
+          var i = area.value.indexOf('___');
           if (i !== -1) area.setSelectionRange(i, i + 3);
         }
       }, s.replace(' ___', '…').replace('___', '…'));
@@ -119,10 +127,11 @@ window.ViewJournal = (function () {
         toast('Fill in the blank first.', 'bad');
         return;
       }
-      Store.addEntry(currentId, { kind: 'manual', body: body, template: usedTemplate, postedToParty: canShare && shareToParty.checked })
+      var title = titleIn.value.trim();
+      Store.addEntry(currentId, { kind: 'manual', title: title || null, body: body, template: usedTemplate, postedToParty: canShare && shareToParty.checked })
         .then(function () {
           if (canShare && shareToParty.checked) {
-            return Party.post(body, 'journal').catch(function () { toast('Logged, but the party post failed.', 'bad'); });
+            return Party.post(body, 'journal', title ? { title: title } : null).catch(function () { toast('Logged, but the party post failed.', 'bad'); });
           }
         })
         .then(function () { return Store.loadEntries(currentId); })
@@ -131,7 +140,9 @@ window.ViewJournal = (function () {
 
     return el('section.card.composer', {},
       el('details', {}, el('summary', {}, 'Starters'), starters),
+      titleIn,
       area,
+      el('span.field-hint', {}, 'Markdown supported — **bold**, *italic*, # headings, lists, and [links](url).'),
       el('div.composer-foot', {},
         canShare
           ? el('label.share-toggle', {}, shareToParty, el('span', {}, 'Also post to party feed'))
@@ -143,6 +154,8 @@ window.ViewJournal = (function () {
 
   function entryRow(e) {
     var isAuto = e.kind === 'auto';
+    var body = renderMarkdown(e.body);
+    body.classList.add('entry-body');
     return el('div.entry' + (isAuto ? '.auto' : ''), {},
       el('div.entry-head', {},
         el('span.entry-kind', {}, isAuto ? (SEED.eventLabels[e.eventType] || 'System') : 'Entry'),
@@ -153,7 +166,8 @@ window.ViewJournal = (function () {
             Store.removeEntry(currentId, e.id).then(App.render);
           }
         }, '✕')),
-      el('div.entry-body', {}, e.body));
+      e.title ? el('div.entry-title', {}, e.title) : null,
+      body);
   }
 
   return { render: render };

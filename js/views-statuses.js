@@ -57,12 +57,20 @@ window.ViewStatuses = (function () {
       el('div.inv-main', { onclick: function () { editStatus(s); } },
         el('div.inv-name', {}, s.name,
           el('span.pol-chip.' + s.polarity, {}, s.polarity === 'buff' ? 'Buff' : 'Debuff')),
-        s.description ? el('div.muted.small', {}, s.description) : null,
+        s.description ? mdMuted(s.description) : null,
         statusModSummary(s),
         el('div.muted.small', {},
           'Applied ' + fmtDate(s.appliedAt) +
           (s.expiresAt ? (expired ? ' · expired ' + fmtDate(s.expiresAt) : ' · expires ' + fmtUntil(s.expiresAt)) : ' · until cleared'))),
       el('button.btn.tiny.ghost', { onclick: function () { clearStatus(s); } }, 'Clear'));
+  }
+
+  /* A status description rendered as Markdown, styled to match the old muted
+   * one-liner. */
+  function mdMuted(text) {
+    var d = renderMarkdown(text);
+    d.className = 'md muted small';
+    return d;
   }
 
   /* Debuffs are stored as positive values; render them as the opposite so the
@@ -113,7 +121,7 @@ window.ViewStatuses = (function () {
       body: el('div', {},
         field('Name', name),
         el('div.form-row', {}, field('Icon', iconCtl), field('Polarity', polarity)),
-        field('Description', desc),
+        field('Description', desc, 'Markdown supported.'),
         field('Duration', durMode), minsWrap,
         el('div.field', {},
           el('span.field-label', {}, 'Modifiers'),

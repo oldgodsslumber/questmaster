@@ -6,7 +6,7 @@
  */
 window.CONFIG = {
 
-  build: '20260727k',
+  build: '20260727l',
 
   /* ---- Attributes ------------------------------------------------------ */
 
@@ -124,6 +124,32 @@ window.CONFIG = {
   iconCdn: 'https://cdn.jsdelivr.net/gh/game-icons/icons@master/',
   iconCacheKey: 'qm.iconcache.v1',
   iconCacheLimit: 400,
+
+  /* ---- Loot: rarities & boxes ------------------------------------------ */
+
+  /* Item rarity ladder — colour and sort order. */
+  rarities: {
+    common:    { label: 'Common',    color: '#9aa4b2', order: 0 },
+    uncommon:  { label: 'Uncommon',  color: '#4f9d69', order: 1 },
+    rare:      { label: 'Rare',      color: '#3f7fc1', order: 2 },
+    epic:      { label: 'Epic',      color: '#9b59b6', order: 3 },
+    legendary: { label: 'Legendary', color: '#d4a027', order: 4 }
+  },
+
+  /* Loot box tiers, straight from the DCC ladder (Bronze → Celestial). Each
+   * tier rolls `rolls[0]..rolls[1]` items, with the rarity odds in `weights`
+   * (relative weights, need not sum to 100). Higher tiers shift the odds up. */
+  lootBoxes: {
+    order: ['bronze', 'silver', 'gold', 'platinum', 'legendary', 'celestial'],
+    tiers: {
+      bronze:    { label: 'Bronze Box',    color: '#a97142', icon: 'delapouite/locked-chest', rolls: [1, 1], weights: { common: 76, uncommon: 21, rare: 3, epic: 0, legendary: 0 } },
+      silver:    { label: 'Silver Box',    color: '#c3ccd6', icon: 'delapouite/locked-chest', rolls: [1, 2], weights: { common: 55, uncommon: 33, rare: 10, epic: 2, legendary: 0 } },
+      gold:      { label: 'Gold Box',      color: '#d4a027', icon: 'delapouite/locked-chest', rolls: [2, 2], weights: { common: 34, uncommon: 38, rare: 21, epic: 6, legendary: 1 } },
+      platinum:  { label: 'Platinum Box',  color: '#7fd0e0', icon: 'delapouite/locked-chest', rolls: [2, 3], weights: { common: 14, uncommon: 34, rare: 33, epic: 16, legendary: 3 } },
+      legendary: { label: 'Legendary Box', color: '#b46fd0', icon: 'delapouite/locked-chest', rolls: [3, 3], weights: { common: 4, uncommon: 20, rare: 36, epic: 30, legendary: 10 } },
+      celestial: { label: 'Celestial Box', color: '#f0c04a', icon: 'delapouite/locked-chest', rolls: [3, 4], weights: { common: 0, uncommon: 10, rare: 30, epic: 40, legendary: 20 } }
+    }
+  },
 
   /* ---- Misc ------------------------------------------------------------- */
 

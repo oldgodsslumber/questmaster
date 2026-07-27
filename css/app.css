@@ -913,3 +913,24 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 
 /* Inline action buttons on status / achievement rows (Share, Clear). */
 .row-actions { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
+
+/* ---- Loot: rarity, boxes, reveal ---------------------------------------- */
+.rarity-chip {
+  font-family: var(--mono); font-size: .56rem; letter-spacing: .06em; text-transform: uppercase;
+  border: 1px solid; border-radius: 4px; padding: 1px 5px; margin-left: 6px; opacity: .95;
+}
+/* Rarity left-border accent on inventory rows. */
+.inv-row.rar-uncommon { border-left: 3px solid #4f9d69; }
+.inv-row.rar-rare { border-left: 3px solid #3f7fc1; }
+.inv-row.rar-epic { border-left: 3px solid #9b59b6; }
+.inv-row.rar-legendary { border-left: 3px solid #d4a027; }
+
+.box-card { border-width: 1px; }
+.box-head { display: flex; align-items: center; gap: 12px; }
+.box-main { flex: 1; min-width: 0; }
+.box-name { font-family: var(--mono); font-weight: 600; font-size: 1.05rem; }
+.box-openall { margin-top: 8px; }
+
+.reveal-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.reveal-row { background: var(--bg-2); border: 1px solid var(--line); border-left-width: 3px; border-radius: var(--r-sm); padding: 8px 10px; }
+.reveal-name { font-weight: 600; font-size: .92rem; }

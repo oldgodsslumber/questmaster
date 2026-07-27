@@ -13,7 +13,7 @@ window.ViewInventory = (function () {
 
   function render(host) {
     host.appendChild(el('div.tabs', {}, [
-      ['equipment', 'Equipment'], ['items', 'Items'], ['spells', 'Spells'], ['abilities', 'Skills']
+      ['equipment', 'Equipment'], ['items', 'Items'], ['spells', 'Spells'], ['abilities', 'Skills'], ['lootboxes', 'Boxes']
     ].map(function (t) {
       return el('button.tab' + (tab === t[0] ? '.on' : ''), {
         onclick: function () { tab = t[0]; App.render(); }
@@ -24,6 +24,14 @@ window.ViewInventory = (function () {
     if (tab === 'items') renderItems(host);
     if (tab === 'spells') renderSpells(host);
     if (tab === 'abilities') renderAbilities(host);
+    if (tab === 'lootboxes') renderBoxes(host);
+  }
+
+  /* A small coloured rarity tag, shown on looted gear and items. */
+  function rarityChip(rarity) {
+    if (!rarity || !CONFIG.rarities[rarity]) return null;
+    var m = CONFIG.rarities[rarity];
+    return el('span.rarity-chip', { style: { color: m.color, borderColor: m.color } }, m.label);
   }
 
   /* ---- Equipment ------------------------------------------------------------ */
@@ -40,11 +48,12 @@ window.ViewInventory = (function () {
       if (!!a.equipped !== !!b.equipped) return a.equipped ? -1 : 1;
       return String(a.name).localeCompare(b.name);
     }).forEach(function (e) {
-      host.appendChild(el('div.inv-row' + (e.equipped ? '.equipped' : ''), {},
+      host.appendChild(el('div.inv-row' + (e.equipped ? '.equipped' : '') + (e.rarity ? '.rar-' + e.rarity : ''), {},
         Icons.node(e.iconSlug, 'lg'),
         el('div.inv-main', { onclick: function () { editEquipment(e); } },
           el('div.inv-name', {},
             e.name,
+            rarityChip(e.rarity),
             e.slot ? el('span.slot-chip', {}, SEED.slotLabel(e.slot)) : null),
           e.description ? el('div.muted.small', {}, e.description) : null,
           ModEditor.summary(e.modifiers)),
@@ -146,10 +155,11 @@ window.ViewInventory = (function () {
     }
 
     list.forEach(function (it) {
-      host.appendChild(el('div.inv-row', {},
+      host.appendChild(el('div.inv-row' + (it.rarity ? '.rar-' + it.rarity : ''), {},
         Icons.node(it.iconSlug, 'lg'),
         el('div.inv-main', { onclick: function () { editItem(it); } },
           el('div.inv-name', {}, it.name,
+            rarityChip(it.rarity),
             (it.quantity || 1) > 1 ? el('span.qty-chip', {}, '×' + it.quantity) : null),
           it.description ? el('div.muted.small', {}, it.description) : null),
         el('div.qty-controls', {},
@@ -497,6 +507,90 @@ window.ViewInventory = (function () {
     });
 
     syncEffect();
+  }
+
+  /* ---- Loot boxes ------------------------------------------------------------
+   * Boxes earned from quests, grouped by tier. Opening one rolls its items into
+   * the relevant inventory tabs and shows a reveal. */
+
+  function renderBoxes(host) {
+    var boxes = Store.state.lootboxes || [];
+
+    host.appendChild(el('div.view-intro', {},
+      el('p.muted', {}, 'Loot boxes come from turning in quests — bigger quests, better boxes. Open one to roll its contents into your Kit.')));
+
+    if (!boxes.length) {
+      host.appendChild(emptyState('🎁', 'No boxes', 'Complete a quest to earn one. Daily chores drop Bronze; larger quests drop better.'));
+      return;
+    }
+
+    /* Group by tier, best first. */
+    var order = CONFIG.lootBoxes.order.slice().reverse();
+    var byTier = {};
+    boxes.forEach(function (b) { (byTier[b.tier] = byTier[b.tier] || []).push(b); });
+
+    order.forEach(function (tier) {
+      var group = byTier[tier];
+      if (!group || !group.length) return;
+      var meta = CONFIG.lootBoxes.tiers[tier];
+      host.appendChild(el('section.card.box-card', { style: { borderColor: meta.color } },
+        el('div.box-head', {},
+          Icons.node(meta.icon, 'lg'),
+          el('div.box-main', {},
+            el('div.box-name', { style: { color: meta.color } }, meta.label),
+            el('div.muted.small', {}, group.length + ' unopened · ' + oddsLine(tier))),
+          el('button.btn.primary', { onclick: function () { openOne(group[0]); } }, 'Open')),
+        group.length > 1
+          ? el('button.btn.tiny.ghost.box-openall', { onclick: function () { openAll(group.slice()); } }, 'Open all ' + group.length)
+          : null));
+    });
+  }
+
+  function oddsLine(tier) {
+    var w = CONFIG.lootBoxes.tiers[tier].weights;
+    var total = 0, k; for (k in w) total += w[k];
+    return CONFIG.lootBoxes.order && ['common', 'uncommon', 'rare', 'epic', 'legendary']
+      .filter(function (r) { return w[r]; })
+      .map(function (r) { return Math.round((w[r] / total) * 100) + '% ' + CONFIG.rarities[r].label; })
+      .join(' · ');
+  }
+
+  function openOne(box) {
+    Loot.openBox(box).then(function (results) {
+      revealModal(box.tier, results);
+      App.render();
+    }).catch(function (e) { toast('Could not open that box — ' + (e.message || 'try again'), 'bad'); });
+  }
+
+  function openAll(boxes) {
+    var all = [];
+    var chain = Promise.resolve();
+    boxes.forEach(function (b) { chain = chain.then(function () { return Loot.openBox(b).then(function (r) { all = all.concat(r); }); }); });
+    chain.then(function () { revealModal(boxes[0].tier, all, boxes.length); App.render(); })
+      .catch(function (e) { toast('Could not open — ' + (e.message || 'try again'), 'bad'); });
+  }
+
+  function revealModal(tier, results, count) {
+    var meta = CONFIG.lootBoxes.tiers[tier];
+    openModal({
+      title: (count && count > 1 ? count + ' ' : '') + meta.label + (count && count > 1 ? 'es opened' : ' opened'),
+      body: el('div', {},
+        el('p.muted.small', {}, results.length + ' item' + (results.length === 1 ? '' : 's') + ' found:'),
+        el('div.reveal-list', {}, results.length
+          ? results.map(function (r) {
+            var m = CONFIG.rarities[r.rarity] || CONFIG.rarities.common;
+            return el('div.reveal-row', { style: { borderColor: m.color } },
+              el('div.reveal-main', {},
+                el('div.reveal-name', { style: { color: m.color } }, r.name,
+                  el('span.rarity-chip', { style: { color: m.color, borderColor: m.color } }, m.label)),
+                el('div.muted.small', {},
+                  (r.kind === 'equipment' ? SEED.slotLabel(r.slot) : 'Item') +
+                  (r.grant ? ' · grants ' + r.grant.name : '') +
+                  (r.desc ? ' — ' + r.desc : ''))));
+          })
+          : el('p.muted', {}, 'The box was empty. The System apologises to no one.'))),
+      actions: [{ label: 'Nice', kind: 'primary' }]
+    });
   }
 
   return { render: render };

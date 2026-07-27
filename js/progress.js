@@ -170,6 +170,15 @@ window.Progress = (function () {
       }
       /* Party members watching the feed hear about a turn-in, not every checkbox. */
       if (window.Party) Party.autoPost(quest, 'quest-complete', streak);
+      /* Turning a quest in earns a loot box, its tier scaled to the quest's
+       * size — daily/small chores drop Bronze, bigger quests drop better. */
+      if (window.Loot) {
+        Loot.awardBoxForQuest(quest).then(function (tier) {
+          var meta = Loot.boxMeta(tier);
+          fanfare(meta.label + ' earned', 'Open it in your Kit');
+          Store.logEvent('loot-box', 'Earned a ' + meta.label + ' from "' + quest.title + '".');
+        }).catch(function (e) { console.warn('[qm] box award failed', e); });
+      }
       return { bonus: bonus, streak: streak };
     });
   }

@@ -34,7 +34,7 @@ window.Store = (function () {
     entries: []        /* entries of the currently-open logbook */
   };
 
-  var SUBCOLLECTIONS = ['skills', 'equipment', 'items', 'spells', 'abilities', 'statuses', 'achievements', 'traits'];
+  var SUBCOLLECTIONS = ['skills', 'equipment', 'items', 'spells', 'abilities', 'statuses', 'achievements', 'traits', 'lootboxes'];
 
   /* ---- Local backend ----------------------------------------------------- */
 

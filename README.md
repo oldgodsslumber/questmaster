@@ -64,6 +64,7 @@ Bump the `?v=` query strings in `index.html` and `CONFIG.build` when you ship a 
 | **M4** Races & Classes | ✅ 12 races, 14 classes, tiered point-buy, detriments at 2-for-1, Earth gating |
 | **M5** Party + friends + sharing | ✅ **Multiple parties** per crawler (create/join by invite code, roster, live snapshots), a **friends list** (add by friend code via a public crawler directory), a shared **newsfeed** combined across your parties and filterable by party (manual posts, journal cross-posts, auto quest turn-ins), and per-quest sharing to a chosen party (view / co-op). Cloud-only — local mode shows a graceful sign-in state. Cross-client co-op *task completion* remains a future add; the rules already permit it. |
 | **M6** Export + polish | 🟡 PNG export works; responsive pass and empty states are in |
+| **M7** Loot + boxes | ✅ A ~1,570-entry loot catalog (`data-loot.js`): 200+ DCC-flavored items per equip slot across five rarities, some granting a spell or skill, plus a pool of standard consumables/valuables/junk. Loot boxes (Bronze → Celestial, DCC's ladder) drop from quest turn-ins — tier scaled to the quest's size — and open in the Kit to roll their contents into your inventory. **Stats** is the old "Skills" (trainable ranks); **Skills** is now a Kit panel of mana-free castable abilities. |
 
 Quest documents already carried `visibility`, `shareMode`, `sharedWith` and `partyId`, and `firestore.rules` already enforced the co-op task-completion rule, so M5 slotted in without a migration.
 

@@ -193,12 +193,26 @@ window.ViewQuests = (function () {
 
   /* ---- Mutations ----------------------------------------------------------------- */
 
+  /* Completing a task triggers a full repaint, which destroys and recreates the
+   * checkbox. A second tap arriving right after — an impatient double-tap, or
+   * the duplicate tap/click some mobile browsers emit for one press — would land
+   * on the freshly-drawn button and flip the completion straight back off, so a
+   * single intended "complete" read as "it unchecked itself". This guard drops
+   * any second toggle of the same task within a short window; deliberate
+   * un-checking still works, it just has to be a distinct tap a beat later. */
+  var lastToggleAt = {};
+  var TOGGLE_GUARD_MS = 500;
+
   /* One toggle fans out into four writes: the task, character XP, the linked
    * skill or attribute, and possibly the quest's completion + streak. They are
    * chained rather than parallel so the quest reconcile sees the task's new
    * state, and every step is signed by the direction so un-checking is a true
    * undo rather than a second, opposite-signed award that drifts. */
   function toggleTask(q, t) {
+    var now = Date.now();
+    if (now - (lastToggleAt[t.id] || 0) < TOGGLE_GUARD_MS) return Promise.resolve();
+    lastToggleAt[t.id] = now;
+
     var next = !t.done;
     var dir = next ? 1 : -1;
 
@@ -214,6 +228,9 @@ window.ViewQuests = (function () {
       .catch(function (e) {
         console.error('[qm] task toggle failed', e);
         toast('Could not save that — ' + (e.message || 'try again'), 'bad');
+        /* Repaint so the checkbox reflects the real saved state instead of a
+         * half-applied optimistic one. */
+        App.render();
       });
   }
 

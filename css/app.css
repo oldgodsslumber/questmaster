@@ -934,3 +934,11 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 .reveal-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
 .reveal-row { background: var(--bg-2); border: 1px solid var(--line); border-left-width: 3px; border-radius: var(--r-sm); padding: 8px 10px; }
 .reveal-name { font-weight: 600; font-size: .92rem; }
+
+/* Collapsible buffs/achievements panel embedded on the Feed. */
+.feed-status { margin-bottom: 12px; }
+.feed-status > summary { cursor: pointer; font-weight: 600; font-size: .88rem; color: var(--ink-2); padding: 8px 2px; list-style: none; }
+.feed-status > summary::-webkit-details-marker { display: none; }
+.feed-status > summary::before { content: '▸ '; color: var(--ink-3); }
+.feed-status[open] > summary::before { content: '▾ '; }
+.feed-status[open] > summary { margin-bottom: 8px; }

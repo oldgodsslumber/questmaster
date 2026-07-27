@@ -21,7 +21,11 @@ window.App = (function () {
     '#/feed': { label: 'Feed', icon: '📰', view: function () { return ViewFeed; } },
     '#/journal': { label: 'Journal', icon: '📖', view: function () { return ViewJournal; } }
   };
-  var NAV_ORDER = ['#/sheet', '#/quests', '#/skills', '#/inventory', '#/statuses', '#/build', '#/party', '#/feed', '#/journal'];
+  /* Stats (#/skills), Status (#/statuses) and Build (#/build) are intentionally
+   * NOT in the nav — they're reached from the Sheet (Stats via "Manage", Build
+   * via "Race & Class", and buffs/achievements are embedded straight into the
+   * Sheet and the Feed). Their routes stay registered so those links still work. */
+  var NAV_ORDER = ['#/sheet', '#/quests', '#/inventory', '#/party', '#/feed', '#/journal'];
 
   var stage = 'boot';    /* boot | signin | create | app */
 

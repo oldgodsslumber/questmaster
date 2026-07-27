@@ -11,6 +11,15 @@ window.ViewFeed = (function () {
   var filter = null;   /* null = everything, 'friends', or a party code */
 
   function render(host) {
+    /* Buffs/debuffs + achievements are addable and visible right here on the
+     * Feed too, folded into a collapsible so they don't crowd the stream. */
+    if (window.ViewStatuses) {
+      var statusBox = el('div');
+      ViewStatuses.panel(statusBox);
+      host.appendChild(el('details.feed-status', {},
+        el('summary', {}, 'Your buffs, debuffs & achievements'), statusBox));
+    }
+
     if (!Store.isCloud() || !Party.available()) {
       host.appendChild(el('section.card', {},
         emptyState('📰', 'The feed is a shared thing',

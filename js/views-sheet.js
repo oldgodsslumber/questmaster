@@ -19,9 +19,11 @@ window.ViewSheet = (function () {
     if (d.custom.length) sheet.appendChild(customStats(d));
     sheet.appendChild(skills(s));
     sheet.appendChild(equipped(s, d));
-    if (s.statuses.length) sheet.appendChild(statuses(s));
+    /* Buffs/debuffs + achievements are managed right here now (the Status tab
+     * was folded into the Sheet), so this is the interactive panel, not a
+     * read-only summary. */
+    ViewStatuses.panel(sheet);
     if (s.traits.length) sheet.appendChild(traitBlock(s));
-    if (s.achievements.length) sheet.appendChild(achievements(s));
     sheet.appendChild(hinges(c));
 
     host.appendChild(sheet);

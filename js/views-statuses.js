@@ -192,20 +192,51 @@ window.ViewStatuses = (function () {
     }
 
     list.slice().sort(function (a, b) { return (b.earnedAt || 0) - (a.earnedAt || 0); }).forEach(function (a) {
-      host.appendChild(el('div.inv-row', {},
-        Icons.node(a.iconSlug, 'lg'),
-        el('div.inv-main', { onclick: function () { editAchievement(a); } },
-          el('div.inv-name', {}, a.name),
-          a.description ? el('div.muted.small', {}, a.description) : null,
-          ModEditor.summary(a.modifiers),
-          el('div.muted.small', {}, 'Earned ' + fmtDate(a.earnedAt))),
-        (window.Party && Party.available())
-          ? el('div.row-actions', {}, el('button.btn.tiny.ghost', { onclick: function () { shareAchievement(a); } }, 'Share'))
-          : null));
+      host.appendChild(achievementRow(a));
     });
 
     host.appendChild(el('div.list-foot', {},
       el('button.btn.primary', { onclick: function () { editAchievement(null); } }, 'Award an achievement')));
+  }
+
+  function achievementRow(a) {
+    return el('div.inv-row', {},
+      Icons.node(a.iconSlug, 'lg'),
+      el('div.inv-main', { onclick: function () { editAchievement(a); } },
+        el('div.inv-name', {}, a.name),
+        a.description ? mdMuted(a.description) : null,
+        ModEditor.summary(a.modifiers),
+        el('div.muted.small', {}, 'Earned ' + fmtDate(a.earnedAt))),
+      (window.Party && Party.available())
+        ? el('div.row-actions', {}, el('button.btn.tiny.ghost', { onclick: function () { shareAchievement(a); } }, 'Share'))
+        : null);
+  }
+
+  /* ---- Embeddable panel ------------------------------------------------------
+   * Buffs/debuffs + achievements as two self-contained cards with Apply/Award
+   * buttons, so the whole thing can live inside the Sheet and the Feed rather
+   * than only on its own tab. */
+  function panel(host) {
+    var now = Date.now();
+    var statuses = Store.state.statuses || [];
+    var active = statuses.filter(function (s) { return !s.expiresAt || s.expiresAt > now; });
+    var lapsed = statuses.filter(function (s) { return s.expiresAt && s.expiresAt <= now; });
+    var achievements = (Store.state.achievements || []).slice().sort(function (a, b) { return (b.earnedAt || 0) - (a.earnedAt || 0); });
+
+    var stBody = [];
+    active.forEach(function (s) { stBody.push(statusRow(s, false)); });
+    if (lapsed.length) { stBody.push(el('div.section-h', {}, 'Expired')); lapsed.forEach(function (s) { stBody.push(statusRow(s, true)); }); }
+    if (!statuses.length) stBody.push(el('p.muted.small', {}, 'No buffs or debuffs applied. Add one when something goes right — or wrong.'));
+
+    host.appendChild(el('section.card', {},
+      el('div.stage-head', {}, el('h2', {}, 'Buffs & Debuffs'),
+        el('button.btn.tiny.primary', { onclick: function () { editStatus(null); } }, 'Apply')),
+      stBody));
+
+    host.appendChild(el('section.card', {},
+      el('div.stage-head', {}, el('h2', {}, 'Achievements'),
+        el('button.btn.tiny.primary', { onclick: function () { editAchievement(null); } }, 'Award')),
+      achievements.length ? achievements.map(achievementRow) : el('p.muted.small', {}, 'No achievements yet. Award one when you have genuinely earned it.')));
   }
 
   function shareAchievement(a) {
@@ -270,5 +301,5 @@ window.ViewStatuses = (function () {
     });
   }
 
-  return { render: render };
+  return { render: render, panel: panel };
 })();

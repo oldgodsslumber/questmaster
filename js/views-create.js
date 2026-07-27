@@ -30,14 +30,27 @@ window.ViewCreate = (function () {
     var body = el('div.create-body');
     var footer = el('div.create-foot');
 
-    function paint() {
+    /* paint(resetScroll): rebuilds the current step. Picking a background or a
+     * gear pack rebuilds the whole step, which collapses the page to zero height
+     * and springs scroll back to the top — that's the "focus jumps up every time
+     * I tap something" the wizard suffered from. So an in-step repaint restores
+     * the scroll offset (and any focused field) it had before the rebuild;
+     * moving between steps passes resetScroll=true to start fresh at the top. */
+    function paint(resetScroll) {
+      var prevScroll = resetScroll ? 0 : (window.scrollY || document.documentElement.scrollTop || 0);
+      var focus = null;
+      var active = document.activeElement;
+      if (!resetScroll && active && active.getAttribute && active.getAttribute('data-focus-key') && body.contains(active)) {
+        focus = { key: active.getAttribute('data-focus-key'), start: active.selectionStart, end: active.selectionEnd };
+      }
+
       clear(body);
       clear(footer);
       steps[step](body, draft, paint);
 
       footer.appendChild(el('button.btn.ghost', {
         disabled: step === 0,
-        onclick: function () { step--; paint(); window.scrollTo(0, 0); }
+        onclick: function () { step--; paint(true); }
       }, 'Back'));
 
       var problem = validate(step, draft);
@@ -46,7 +59,7 @@ window.ViewCreate = (function () {
       if (step < steps.length - 1) {
         footer.appendChild(el('button.btn.primary', {
           disabled: !!problem,
-          onclick: function () { step++; paint(); window.scrollTo(0, 0); }
+          onclick: function () { step++; paint(true); }
         }, 'Continue'));
       } else {
         footer.appendChild(el('button.btn.primary', {
@@ -59,6 +72,22 @@ window.ViewCreate = (function () {
         d.classList.toggle('on', i === step);
         d.classList.toggle('done', i < step);
       });
+
+      window.scrollTo(0, prevScroll);
+      /* A tall step (Background) isn't fully laid out the instant we restore, so
+       * the first scrollTo can clamp short; re-apply once the frame settles. */
+      if (!resetScroll && prevScroll) {
+        requestAnimationFrame(function () { window.scrollTo(0, prevScroll); });
+      }
+      if (focus) {
+        var next = body.querySelector('[data-focus-key="' + focus.key + '"]');
+        if (next) {
+          next.focus();
+          if (focus.start != null && next.setSelectionRange) {
+            try { next.setSelectionRange(focus.start, focus.end); } catch (e) { /* non-text field */ }
+          }
+        }
+      }
     }
 
     var crumbs = el('div.create-crumbs', {}, stepNames.map(function (n, i) {

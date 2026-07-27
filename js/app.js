@@ -13,7 +13,7 @@ window.App = (function () {
   var ROUTES = {
     '#/sheet': { label: 'Sheet', icon: '🧍', view: function () { return ViewSheet; } },
     '#/quests': { label: 'Quests', icon: '🗺️', view: function () { return ViewQuests; } },
-    '#/skills': { label: 'Skills', icon: '📜', view: function () { return ViewSkills; } },
+    '#/skills': { label: 'Stats', icon: '📊', view: function () { return ViewSkills; } },
     '#/inventory': { label: 'Kit', icon: '🎒', view: function () { return ViewInventory; } },
     '#/statuses': { label: 'Status', icon: '✨', view: function () { return ViewStatuses; } },
     '#/build': { label: 'Build', icon: '🧬', view: function () { return ViewBuild; } },

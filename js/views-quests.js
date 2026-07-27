@@ -188,7 +188,7 @@ window.ViewQuests = (function () {
       return 'trains ' + (CONFIG.attributeNames[target.id] || target.id);
     }
     var skill = Store.find('skills', target.id);
-    return 'trains ' + (skill ? skill.name : 'a skill');
+    return 'trains ' + (skill ? skill.name : 'a stat');
   }
 
   /* ---- Mutations ----------------------------------------------------------------- */
@@ -433,12 +433,12 @@ window.ViewQuests = (function () {
 
     var kindSel = selectInput([
       { value: 'none', label: 'Nothing' },
-      { value: 'skill', label: 'A skill' },
+      { value: 'skill', label: 'A stat' },
       { value: 'attribute', label: 'An attribute' }
     ], target.id ? target.kind : 'none');
 
     var skillSel = selectInput(
-      [{ value: '', label: '— choose a skill —' }].concat(Store.state.skills.map(function (s) {
+      [{ value: '', label: '— choose a stat —' }].concat(Store.state.skills.map(function (s) {
         return { value: s.id, label: s.name + ' (Rank ' + (s.rank || 0) + ')' };
       })),
       target.kind === 'skill' ? target.id : '');
@@ -449,7 +449,7 @@ window.ViewQuests = (function () {
 
     var trainXp = numInput(target.xp || CONFIG.skillTrainingXpDefault, 0);
 
-    var skillWrap = field('Skill', skillSel);
+    var skillWrap = field('Stat', skillSel);
     var attrWrap = field('Attribute', attrSel,
       'Attribute training fills a hidden pool; ' + CONFIG.attributeTrainingThreshold + ' points buy a permanent +1.');
     var trainXpWrap = field('Training XP', trainXp);

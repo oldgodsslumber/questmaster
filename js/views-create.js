@@ -203,7 +203,7 @@ window.ViewCreate = (function () {
   function stepBackgrounds(host, draft, paint) {
     host.appendChild(el('section.card', {},
       el('h2', {}, 'Four stages of a life on Earth'),
-      el('p.muted', {}, 'Each grants two skills at a fixed rank. Career counts for the most — it is what you actually spent your days doing.')));
+      el('p.muted', {}, 'Each grants two stats at a fixed rank. Career counts for the most — it is what you actually spent your days doing.')));
 
     SEED.stages.forEach(function (stage) {
       var chosen = draft.picks[stage.key];
@@ -230,7 +230,7 @@ window.ViewCreate = (function () {
     host.appendChild(el('section.card', {},
       el('div.stage-head', {}, el('h3', {}, 'Weapon training'), el('span.rank-chip', {}, 'Rank 3')),
       el('p.muted', {}, 'Everyone arrives knowing Unarmed Combat at Rank 3. Pick one weapon you also happen to know.'),
-      field('Specialised weapon skill', weaponSel)));
+      field('Specialised weapon stat', weaponSel)));
 
     host.appendChild(customSkillCard(draft, paint));
     host.appendChild(previewSkills(draft));
@@ -241,8 +241,8 @@ window.ViewCreate = (function () {
    * always add more from the Skills tab later. */
   function customSkillCard(draft, paint) {
     return el('section.card', {},
-      el('div.stage-head', {}, el('h3', {}, 'Skills of your own'), el('span.rank-chip', {}, 'Optional')),
-      el('p.muted', {}, 'Add anything the lists missed — Parkour, Coding, Falconry. Duplicates of a granted skill keep the higher rank.'),
+      el('div.stage-head', {}, el('h3', {}, 'Stats of your own'), el('span.rank-chip', {}, 'Optional')),
+      el('p.muted', {}, 'Add anything the lists missed — Parkour, Coding, Falconry. Duplicates of a granted stat keep the higher rank.'),
       draft.customSkills.length
         ? el('div.custom-skill-list', {}, draft.customSkills.map(function (s, i) {
           return el('div.custom-skill-row', {},
@@ -255,7 +255,7 @@ window.ViewCreate = (function () {
             }, '✕'));
         }))
         : null,
-      el('button.btn.tiny.primary', { type: 'button', onclick: function () { addCustomSkill(draft, paint); } }, '+ Add skill'));
+      el('button.btn.tiny.primary', { type: 'button', onclick: function () { addCustomSkill(draft, paint); } }, '+ Add stat'));
   }
 
   function addCustomSkill(draft, paint) {
@@ -264,7 +264,7 @@ window.ViewCreate = (function () {
     var iconSlug = null;
     var iconCtl = Icons.iconField(null, function (v) { iconSlug = v; });
     openModal({
-      title: 'Custom skill',
+      title: 'Custom stat',
       body: el('div', {},
         field('Name', name),
         el('div.form-row', {}, field('Icon', iconCtl), field('Starting rank', rank, 'Cap ' + CONFIG.skillRankMax))),
@@ -273,7 +273,7 @@ window.ViewCreate = (function () {
         {
           label: 'Add', kind: 'primary', onClick: function () {
             var nm = name.value.trim();
-            if (!nm) { toast('A skill needs a name.', 'bad'); return false; }
+            if (!nm) { toast('A stat needs a name.', 'bad'); return false; }
             draft.customSkills.push({
               name: nm,
               rank: Math.max(0, Math.min(CONFIG.skillRankMax, parseInt(rank.value, 10) || 0)),
@@ -290,7 +290,7 @@ window.ViewCreate = (function () {
   function previewSkills(draft) {
     var merged = mergeSkills(draft);
     return el('section.card.preview', {},
-      el('h3', {}, 'Skills you will start with'),
+      el('h3', {}, 'Stats you will start with'),
       el('div.skill-preview', {}, merged.map(function (s) {
         return el('span.skill-chip', {}, Icons.node(s.iconSlug), s.name, el('b', {}, 'R' + s.rank));
       })));

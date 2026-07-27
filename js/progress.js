@@ -53,7 +53,7 @@ window.Progress = (function () {
     var next = Engine.grantSkillXp(skill, amount);
     return Store.update('skills', skillId, { rank: next.rank, xp: next.xp }).then(function () {
       if (next.ranksGained > 0) {
-        fanfare(skill.name + ' Rank ' + next.rank, 'Skill advanced');
+        fanfare(skill.name + ' Rank ' + next.rank, 'Stat advanced');
         Store.logEvent('skill-rank', skill.name + ' advanced to Rank ' + next.rank + '.');
       }
       return next;

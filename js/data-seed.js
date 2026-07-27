@@ -254,13 +254,16 @@ window.SEED = (function () {
   var eventLabels = {
     'quest-complete': 'Quest turned in',
     'level-up': 'Level gained',
-    'skill-rank': 'Skill rank raised',
+    'skill-rank': 'Stat rank raised',
     'status-applied': 'Status applied',
     'status-cleared': 'Status cleared',
     'item-gained': 'Item acquired',
     'achievement': 'Achievement earned',
     'streak': 'Streak milestone',
     'spell-cast': 'Spell cast',
+    'ability-used': 'Skill used',
+    'loot-box': 'Loot box earned',
+    'loot': 'Loot found',
     'build': 'Build changed',
     'created': 'Crawler registered'
   };

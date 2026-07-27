@@ -232,12 +232,12 @@ window.ViewSheet = (function () {
 
   function skills(s) {
     if (!s.skills.length) {
-      return el('section.card', {}, el('h2', {}, 'Skills'),
-        emptyState('📜', 'No skills yet', 'Add one from the Skills view, or link a task to train one.'));
+      return el('section.card', {}, el('h2', {}, 'Stats'),
+        emptyState('📊', 'No stats yet', 'Add one from the Stats view, or link a task to train one.'));
     }
     return el('section.card', {},
       el('div.stage-head', {},
-        el('h2', {}, 'Skills'),
+        el('h2', {}, 'Stats'),
         el('button.btn.tiny.ghost', { onclick: function () { App.go('#/skills'); } }, 'Manage')),
       el('div.skill-list', {}, s.skills.slice().sort(function (a, b) {
         return (b.rank || 0) - (a.rank || 0) || String(a.name).localeCompare(b.name);

@@ -13,16 +13,17 @@ window.ViewInventory = (function () {
 
   function render(host) {
     host.appendChild(el('div.tabs', {}, [
-      ['equipment', 'Equipment'], ['items', 'Items'], ['spells', 'Spells']
+      ['equipment', 'Equipment'], ['items', 'Items'], ['spells', 'Spells'], ['abilities', 'Skills']
     ].map(function (t) {
       return el('button.tab' + (tab === t[0] ? '.on' : ''), {
         onclick: function () { tab = t[0]; App.render(); }
-      }, t[1], el('span.tab-count', {}, Store.state[t[0]].length));
+      }, t[1], el('span.tab-count', {}, (Store.state[t[0]] || []).length));
     })));
 
     if (tab === 'equipment') renderEquipment(host);
     if (tab === 'items') renderItems(host);
     if (tab === 'spells') renderSpells(host);
+    if (tab === 'abilities') renderAbilities(host);
   }
 
   /* ---- Equipment ------------------------------------------------------------ */
@@ -356,6 +357,139 @@ window.ViewInventory = (function () {
               } : null
             };
             var op = isNew ? Store.add('spells', patch) : Store.update('spells', sp.id, patch);
+            op.then(function () { App.render(); });
+          }
+        }
+      ])
+    });
+
+    syncEffect();
+  }
+
+  /* ---- Skills (abilities) ----------------------------------------------------
+   * The same shape as spells, minus mana — free to use, on-tap. This is the
+   * "Skills" panel: loot can grant these, and they apply a heal and/or a status
+   * exactly like a spell would, without spending anything. */
+
+  function renderAbilities(host) {
+    var list = Store.state.abilities || [];
+    var d = Engine.derive(Store.state);
+
+    host.appendChild(el('div.view-intro', {},
+      el('p.muted', {}, 'Skills are abilities you use freely — like spells, but they cost no mana. Some loot grants them.')));
+
+    if (!list.length) {
+      host.appendChild(emptyState('🎯', 'No skills', 'Add one, or loot an item that grants a skill.'));
+    }
+
+    list.forEach(function (ab) {
+      host.appendChild(el('div.inv-row', {},
+        Icons.node(ab.iconSlug, 'lg'),
+        el('div.inv-main', { onclick: function () { editAbility(ab); } },
+          el('div.inv-name', {}, ab.name,
+            ab.rank ? el('span.rank-chip', {}, 'Rank ' + ab.rank) : null,
+            el('span.slot-chip', {}, 'No cost')),
+          ab.description ? el('div.muted.small', {}, ab.description) : null),
+        el('button.btn.tiny.primary', { onclick: function () { useAbility(ab, d); } }, 'Use')));
+    });
+
+    host.appendChild(el('div.list-foot', {},
+      el('button.btn.primary', { onclick: function () { editAbility(null); } }, 'New skill')));
+  }
+
+  function useAbility(ab, d) {
+    var c = Store.state.character;
+    var res = Object.assign({}, c.resources || {});
+    var note = '';
+    var chain = Promise.resolve();
+
+    if (ab.effect === 'heal') {
+      var restored = (ab.effectValue || 0) * d.slotCapacity;
+      var before = res.currentHealth || 0;
+      res.currentHealth = Math.min(d.maxHealth, before + restored);
+      note = ' Restored ' + (res.currentHealth - before) + ' health (' + (ab.effectValue || 0) + ' slots).';
+      chain = Store.saveCharacter({ resources: res });
+    }
+
+    if (ab.onUseStatus && ab.onUseStatus.name) {
+      chain = chain.then(function () {
+        return Store.add('statuses', {
+          name: ab.onUseStatus.name,
+          iconSlug: ab.iconSlug,
+          description: 'Applied by using ' + ab.name + '.',
+          polarity: ab.onUseStatus.polarity || 'buff',
+          modifiers: ab.onUseStatus.modifiers || [],
+          appliedAt: Date.now(),
+          expiresAt: ab.onUseStatus.durationMins ? Date.now() + ab.onUseStatus.durationMins * 60000 : null
+        });
+      });
+      note += ' ' + ab.onUseStatus.name + ' applied.';
+    }
+
+    chain.then(function () {
+      Store.logEvent('ability-used', 'Used ' + ab.name + '.' + note);
+      toast('Used ' + ab.name + '.' + note);
+      App.render();
+    });
+  }
+
+  function editAbility(ab) {
+    var isNew = !ab;
+    var name = textInput(ab ? ab.name : '', 'Adrenaline Rush');
+    var desc = textArea(ab ? ab.description : '', '', 2);
+    var rank = numInput(ab ? ab.rank || 1 : 1, 1);
+    var iconSlug = ab ? ab.iconSlug : null;
+    var iconCtl = Icons.iconField(iconSlug, function (s) { iconSlug = s; });
+
+    var effect = selectInput([
+      { value: '', label: 'Nothing mechanical' },
+      { value: 'heal', label: 'Restore health slots' }
+    ], ab ? ab.effect || '' : '');
+    var effectVal = numInput(ab ? ab.effectValue || 0 : 1, 0);
+    var effectValWrap = field('Slots restored', effectVal);
+    function syncEffect() { effectValWrap.style.display = effect.value === 'heal' ? '' : 'none'; }
+    effect.addEventListener('change', syncEffect);
+
+    var st = (ab && ab.onUseStatus) || null;
+    var stName = textInput(st ? st.name : '', 'Leave blank for none');
+    var stPolarity = selectInput([{ value: 'buff', label: 'Buff' }, { value: 'debuff', label: 'Debuff' }], st ? st.polarity : 'buff');
+    var stDuration = numInput(st ? st.durationMins || '' : '', 0);
+    var stMods = ModEditor.create(st ? st.modifiers : []);
+
+    openModal({
+      title: isNew ? 'New skill' : 'Edit skill',
+      body: el('div', {},
+        field('Name', name),
+        el('div.form-row', {}, field('Icon', iconCtl), field('Rank', rank)),
+        field('Description', desc),
+        field('On use', effect), effectValWrap,
+        el('details.sub-form', {},
+          el('summary', {}, 'Also apply a status'),
+          field('Status name', stName),
+          el('div.form-row', {}, field('Polarity', stPolarity), field('Duration (mins)', stDuration, 'Blank = until cleared')),
+          el('div.field', {}, el('span.field-label', {}, 'Status modifiers'), stMods))),
+      actions: (isNew ? [] : [{
+        label: 'Delete', kind: 'danger', onClick: function () { Store.remove('abilities', ab.id).then(App.render); }
+      }]).concat([
+        { label: 'Cancel', kind: 'ghost' },
+        {
+          label: isNew ? 'Create' : 'Save', kind: 'primary', onClick: function () {
+            if (!name.value.trim()) { toast('A name is required.', 'bad'); return false; }
+            var patch = {
+              name: name.value.trim(),
+              description: desc.value.trim(),
+              rank: Math.max(1, parseInt(rank.value, 10) || 1),
+              iconSlug: iconSlug,
+              effect: effect.value || null,
+              effectValue: parseInt(effectVal.value, 10) || 0,
+              onUseStatus: stName.value.trim() ? {
+                name: stName.value.trim(),
+                polarity: stPolarity.value,
+                durationMins: parseInt(stDuration.value, 10) || null,
+                modifiers: stMods.getMods()
+              } : null
+            };
+            var op = isNew ? Store.add('abilities', patch) : Store.update('abilities', ab.id, patch);
             op.then(function () { App.render(); });
           }
         }

@@ -11,10 +11,10 @@ window.ViewSkills = (function () {
     var skills = Store.state.skills;
 
     host.appendChild(el('div.view-intro', {},
-      el('p.muted', {}, 'Link a task to a skill and finishing it trains that skill. Ranks cap at ' + CONFIG.skillRankMax + '.')));
+      el('p.muted', {}, 'Link a task to a stat and finishing it trains that stat. Ranks cap at ' + CONFIG.skillRankMax + '.')));
 
     if (!skills.length) {
-      host.appendChild(emptyState('📜', 'No skills', 'Your backgrounds should have seeded some. Add one manually if you cleared them out.'));
+      host.appendChild(emptyState('📊', 'No stats', 'Your backgrounds should have seeded some. Add one manually if you cleared them out.'));
     }
 
     skills.slice().sort(function (a, b) {
@@ -48,7 +48,7 @@ window.ViewSkills = (function () {
     });
 
     host.appendChild(el('div.list-foot', {},
-      el('button.btn.primary', { onclick: function () { editSkill(null); } }, 'New skill')));
+      el('button.btn.primary', { onclick: function () { editSkill(null); } }, 'New stat')));
   }
 
   function tasksTraining(skillId) {
@@ -70,7 +70,7 @@ window.ViewSkills = (function () {
     openModal({
       title: 'Log practice — ' + s.name,
       body: el('div', {},
-        el('p.modal-text', {}, 'Add skill XP directly, for practice that did not run through a task.'),
+        el('p.modal-text', {}, 'Add stat XP directly, for practice that did not run through a task.'),
         field('XP', amount)),
       actions: [
         { label: 'Cancel', kind: 'ghost' },
@@ -97,7 +97,7 @@ window.ViewSkills = (function () {
      * known skill name — so typing "Stealth" gets you the hood without hunting
      * through 4,229 options. */
     openModal({
-      title: isNew ? 'New skill' : 'Edit skill',
+      title: isNew ? 'New stat' : 'Edit stat',
       body: el('div', {},
         field('Name', name),
         el('div.form-row', {}, field('Icon', iconCtl), field('Rank', rank, 'Cap ' + CONFIG.skillRankMax)),

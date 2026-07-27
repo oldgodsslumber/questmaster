@@ -101,21 +101,31 @@ window.App = (function () {
     Store.attach(uid, ctx);
     Store.load()
       .then(function (character) {
-        if (!character) { stage = 'create'; render(); return null; }
-        /* Resets run once per load, before anything is drawn — otherwise you
-         * would see yesterday's checkmarks for a frame. */
-        return Progress.runResets().then(function () {
-          stage = 'app';
-          if (window.Party) Party.attach();
-          if (!location.hash || !ROUTES[location.hash]) location.hash = '#/quests';
-          render();
-        });
+        if (!character) { stage = 'create'; safeRender(); return; }
+
+        /* The character is loaded — you are IN. Nothing past this point may
+         * bounce you back to sign-in: resets, the party layer, and even a
+         * rendering hiccup are all best-effort. Only a genuine failure to read
+         * the character document itself (the .catch below) is a real login
+         * failure. This is why login broke twice — a downstream write or render
+         * error was being treated as "couldn't log in". */
+        stage = 'app';
+        if (!location.hash || !ROUTES[location.hash]) location.hash = '#/quests';
+        try { if (window.Party) Party.attach(); } catch (e) { console.warn('[qm] party attach failed', e); }
+        safeRender();
+
+        /* Resets can write to Firestore; a denied/failed write must never block
+         * or undo entry. Run them after we're already in and repaint if they
+         * changed anything. */
+        Progress.runResets()
+          .then(function () { if (stage === 'app') safeRender(); })
+          .catch(function (e) { console.warn('[qm] resets failed (continuing)', e); });
       })
       .catch(function (e) {
-        console.error('[qm] load failed', e);
+        console.error('[qm] could not read character document', e);
         toast('Could not load your character — ' + (e.message || 'unknown error'), 'bad');
         stage = 'signin';
-        render();
+        safeRender();
       });
   }
 
@@ -129,6 +139,13 @@ window.App = (function () {
   }
 
   /* ---- Render ------------------------------------------------------------------- */
+
+  /* render() that can never throw out to its caller — a view or nav paint error
+   * shows an in-place message instead of rejecting a promise chain (which, from
+   * the post-login chain, would have kicked the user to the sign-in screen). */
+  function safeRender() {
+    try { render(); } catch (e) { console.error('[qm] render crashed', e); }
+  }
 
   function render() {
     var main = document.getElementById('view');
@@ -156,7 +173,7 @@ window.App = (function () {
     if (stage === 'create') { nav.hidden = true; lastPaintedHash = null; ViewCreate.render(main); return; }
 
     nav.hidden = false;
-    paintNav(nav);
+    try { paintNav(nav); } catch (e) { console.error('[qm] nav paint failed', e); }
 
     var route = ROUTES[location.hash] || ROUTES['#/quests'];
     var wrap = el('div.view.' + (location.hash || '#/quests').replace('#/', 'v-'));

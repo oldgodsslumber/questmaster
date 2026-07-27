@@ -52,7 +52,26 @@ window.Engine = (function () {
     }
 
     take((state.equipment || []).filter(function (e) { return e.equipped; }), 'equipment');
-    take((state.statuses || []).filter(function (s) { return !s.expiresAt || s.expiresAt > now; }), 'status');
+
+    /* Statuses store positive values plus a polarity. A buff applies them as
+     * entered; a debuff applies the mathematical opposite — +N becomes -N and
+     * ×N becomes ÷N (multiply by the reciprocal) — so there is never a minus to
+     * type in and the two are always exact mirrors. */
+    (state.statuses || []).filter(function (s) { return !s.expiresAt || s.expiresAt > now; })
+      .forEach(function (doc) {
+        var debuff = doc.polarity === 'debuff';
+        (doc.modifiers || []).forEach(function (m) {
+          if (!m || !m.stat || typeof m.value !== 'number') return;
+          var op = m.op === 'mult' ? 'mult' : 'add';
+          var value = m.value;
+          if (debuff) value = op === 'mult' ? (m.value ? 1 / m.value : 1) : -m.value;
+          out.push({
+            stat: m.stat, op: op, value: value,
+            sourceKind: 'status', sourceName: doc.name || '(unnamed)', sourceId: doc.id
+          });
+        });
+      });
+
     take(state.achievements, 'achievement');
     take(state.traits, 'trait');
     return out;

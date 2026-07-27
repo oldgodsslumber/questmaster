@@ -58,11 +58,23 @@ window.ViewStatuses = (function () {
         el('div.inv-name', {}, s.name,
           el('span.pol-chip.' + s.polarity, {}, s.polarity === 'buff' ? 'Buff' : 'Debuff')),
         s.description ? el('div.muted.small', {}, s.description) : null,
-        ModEditor.summary(s.modifiers),
+        statusModSummary(s),
         el('div.muted.small', {},
           'Applied ' + fmtDate(s.appliedAt) +
           (s.expiresAt ? (expired ? ' · expired ' + fmtDate(s.expiresAt) : ' · expires ' + fmtUntil(s.expiresAt)) : ' · until cleared'))),
       el('button.btn.tiny.ghost', { onclick: function () { clearStatus(s); } }, 'Clear'));
+  }
+
+  /* Debuffs are stored as positive values; render them as the opposite so the
+   * card shows the reduction the player actually feels (−N, ÷N). */
+  function statusModSummary(s) {
+    var debuff = s.polarity === 'debuff';
+    var mods = (s.modifiers || []).map(function (m) {
+      var v = Math.abs(m.value);
+      if (debuff) return { stat: m.stat, op: m.op === 'mult' ? 'div' : 'add', value: m.op === 'mult' ? v : -v };
+      return { stat: m.stat, op: m.op, value: v };
+    });
+    return ModEditor.summary(mods);
   }
 
   function clearStatus(s) {
@@ -82,7 +94,10 @@ window.ViewStatuses = (function () {
     ], s ? s.polarity : 'buff');
     var iconSlug = s ? s.iconSlug : null;
     var iconCtl = Icons.iconField(iconSlug, function (v) { iconSlug = v; });
-    var mods = ModEditor.create(s ? s.modifiers : []);
+    var mods = ModEditor.create(s ? s.modifiers : [], { positiveOnly: true });
+
+    var canShare = window.Party && Party.available() && Party.inParty();
+    var shareToFeed = el('input', { type: 'checkbox' });
 
     var durMode = selectInput([
       { value: 'none', label: 'Until I clear it' },
@@ -102,8 +117,9 @@ window.ViewStatuses = (function () {
         field('Duration', durMode), minsWrap,
         el('div.field', {},
           el('span.field-label', {}, 'Modifiers'),
-          el('span.field-hint', {}, 'Debuffs are just negative values — the polarity is only for colour.'),
-          mods)),
+          el('span.field-hint', {}, 'Enter positive values with + or ×. A debuff applies the opposite automatically — +2 becomes −2, ×2 becomes ÷2.'),
+          mods),
+        canShare ? el('label.share-toggle', {}, shareToFeed, el('span', {}, 'Also post to party feed')) : null),
       actions: (isNew ? [] : [{
         label: 'Clear', kind: 'danger', onClick: function () { clearStatus(s); }
       }]).concat([
@@ -127,6 +143,11 @@ window.ViewStatuses = (function () {
             op.then(function () {
               if (isNew) {
                 Store.logEvent('status-applied', patch.name + ' applied (' + patch.polarity + ').');
+                if (canShare && shareToFeed.checked) {
+                  var who = (Store.state.character && Store.state.character.name) || 'A crawler';
+                  Party.post(who + (patch.polarity === 'buff' ? ' gained the buff "' : ' took on the debuff "') + patch.name + '".', 'status')
+                    .catch(function () { toast('Applied, but the party post failed.', 'bad'); });
+                }
                 toast(patch.name + ' applied.');
               }
               App.render();
@@ -173,6 +194,9 @@ window.ViewStatuses = (function () {
     var iconCtl = Icons.iconField(iconSlug, function (v) { iconSlug = v; });
     var mods = ModEditor.create(a ? a.modifiers : []);
 
+    var canShare = window.Party && Party.available() && Party.inParty();
+    var shareToFeed = el('input', { type: 'checkbox', checked: isNew });
+
     openModal({
       title: isNew ? 'Award an achievement' : 'Edit achievement',
       body: el('div', {},
@@ -182,7 +206,8 @@ window.ViewStatuses = (function () {
         el('div.field', {},
           el('span.field-label', {}, 'Permanent modifiers'),
           el('span.field-hint', {}, 'Optional — plenty of achievements are just a record.'),
-          mods)),
+          mods),
+        canShare && isNew ? el('label.share-toggle', {}, shareToFeed, el('span', {}, 'Announce it on the party feed')) : null),
       actions: (isNew ? [] : [{
         label: 'Delete', kind: 'danger', onClick: function () { Store.remove('achievements', a.id).then(App.render); }
       }]).concat([
@@ -197,7 +222,14 @@ window.ViewStatuses = (function () {
               modifiers: mods.getMods()
             };
             if (isNew) {
-              Progress.grantAchievement(patch).then(App.render);
+              Progress.grantAchievement(patch).then(function () {
+                if (canShare && shareToFeed.checked) {
+                  var who = (Store.state.character && Store.state.character.name) || 'A crawler';
+                  Party.post(who + ' earned the achievement "' + patch.name + '". 🎖️', 'achievement')
+                    .catch(function () {});
+                }
+                App.render();
+              });
               return;
             }
             Store.update('achievements', a.id, patch).then(App.render);

@@ -56,13 +56,18 @@ window.ViewFeed = (function () {
         el('button.btn.primary', { onclick: send }, 'Post')));
   }
 
+  /* System-flavoured posts (turn-ins, achievements, statuses) get an emblem and
+   * the highlighted style; a person's own words keep their initial. */
+  var KIND_ICON = { 'quest-complete': '🏆', 'achievement': '🎖️', 'status': '✨', 'journal': '📖' };
+  var SYSTEM_KIND = { 'quest-complete': 1, 'achievement': 1, 'status': 1 };
+
   function postRow(p) {
     var mine = p.authorUid === Party.myUid();
-    var isAuto = p.kind === 'quest-complete';
+    var isSystem = !!SYSTEM_KIND[p.kind];
     var initial = (p.authorName || '?').slice(0, 1).toUpperCase();
 
-    return el('div.feed-post' + (isAuto ? '.auto' : ''), {},
-      el('div.feed-avatar', {}, isAuto ? '🏆' : initial),
+    return el('div.feed-post' + (isSystem ? '.auto' : ''), {},
+      el('div.feed-avatar', {}, KIND_ICON[p.kind] || initial),
       el('div.feed-body-wrap', {},
         el('div.feed-head', {},
           el('span.feed-author', {}, p.authorName || 'Crawler'),

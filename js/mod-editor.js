@@ -7,8 +7,17 @@
  */
 window.ModEditor = (function () {
 
-  function create(initial) {
-    var mods = (initial || []).map(function (m) { return Object.assign({}, m); });
+  function create(initial, opts) {
+    opts = opts || {};
+    /* positiveOnly: used by buffs/debuffs. You only ever type a positive value
+     * with + or ×; a debuff's polarity flips it to the opposite (− and ÷) at
+     * computation time, so there is no minus to enter here. */
+    var positiveOnly = !!opts.positiveOnly;
+    var mods = (initial || []).map(function (m) {
+      var c = Object.assign({}, m);
+      if (positiveOnly && typeof c.value === 'number') c.value = Math.abs(c.value);
+      return c;
+    });
     var list = el('div.mod-editor');
 
     var datalistId = 'stat-keys-' + uid();
@@ -32,8 +41,15 @@ window.ModEditor = (function () {
         opSel.classList.add('op');
         opSel.addEventListener('change', function () { mods[i].op = opSel.value; });
 
-        var valIn = el('input.input.num', { type: 'number', step: 'any', value: m.value === undefined ? '' : m.value });
-        valIn.addEventListener('input', function () { mods[i].value = parseFloat(valIn.value); });
+        var valIn = el('input.input.num', {
+          type: 'number', step: 'any',
+          min: positiveOnly ? '0' : undefined,
+          value: m.value === undefined ? '' : m.value
+        });
+        valIn.addEventListener('input', function () {
+          var v = parseFloat(valIn.value);
+          mods[i].value = positiveOnly && !isNaN(v) ? Math.abs(v) : v;
+        });
 
         list.appendChild(el('div.mod-row', {}, statIn, opSel, valIn,
           el('button.icon-btn.subtle', {
@@ -61,7 +77,12 @@ window.ModEditor = (function () {
       return mods.filter(function (m) {
         return m.stat && typeof m.value === 'number' && !isNaN(m.value);
       }).map(function (m) {
-        return { stat: m.stat, op: m.op === 'mult' ? 'mult' : 'add', value: m.value };
+        var value = positiveOnly ? Math.abs(m.value) : m.value;
+        return { stat: m.stat, op: m.op === 'mult' ? 'mult' : 'add', value: value };
+      }).filter(function (m) {
+        /* A zero-value modifier does nothing; a positive-only ×0 would zero the
+         * stat, which is never what "enter a positive number" meant. */
+        return !(positiveOnly && m.value === 0);
       });
     };
 
@@ -69,11 +90,16 @@ window.ModEditor = (function () {
   }
 
   /* Compact read-only rendering, used on cards and rows. */
+  /* `div` never persists and never reaches the engine — it exists only as a
+   * display form so a debuff's ×N reads as ÷N on the sheet. */
   function summary(mods) {
     if (!mods || !mods.length) return null;
     return el('div.mod-summary', {}, mods.map(function (m) {
-      return el('span.mod-tag' + (m.value < 0 ? '.neg' : ''), {},
-        (m.op === 'mult' ? '×' + m.value : signed(m.value)) + ' ' + m.stat);
+      var neg = m.value < 0 || m.op === 'div';
+      var txt = m.op === 'mult' ? '×' + m.value
+        : m.op === 'div' ? '÷' + m.value
+          : signed(m.value);
+      return el('span.mod-tag' + (neg ? '.neg' : ''), {}, txt + ' ' + m.stat);
     }));
   }
 

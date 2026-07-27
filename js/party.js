@@ -153,24 +153,43 @@ window.Party = (function () {
 
   /* ---- Identity / public card -------------------------------------------- */
 
-  /* Publish (or refresh) this crawler's public card, minting a friend code the
-   * first time. Fire-and-forget; a friends list that is briefly stale is fine. */
+  /* Mint or refresh this crawler's friend code. The code is written to our OWN
+   * character first — a write we are always allowed to make — so it appears in
+   * the Friends tab even if the public-directory writes are blocked (e.g. the
+   * new firestore.rules haven't been deployed yet). The directory (the
+   * crawlerCodes index + the public card) is then filled in best-effort: adding
+   * friends by code needs it, but the code itself still shows. */
+  function idxWarn(e) {
+    console.warn('[qm] friend-directory write failed — deploy firestore.rules for friends to fully work.', e);
+  }
+
   function ensureIdentity() {
     var c = myChar();
     if (c.friendCode) {
       publishCard(c.friendCode);
-      Store.saveCrawlerCode(c.friendCode, { uid: myUid() }).catch(function () {});
+      Store.saveCrawlerCode(c.friendCode, { uid: myUid() }).catch(idxWarn);
       return;
     }
-    (function claim(tries) {
-      var code = genCode();
-      Store.getCrawlerCode(code).then(function (ex) {
-        if (ex && ex.uid && ex.uid !== myUid() && tries > 0) return claim(tries - 1);
-        return Store.saveCrawlerCode(code, { uid: myUid() })
-          .then(function () { return Store.saveCharacter({ friendCode: code }); })
-          .then(function () { publishCard(code); emit(); });
-      }).catch(function () {});
-    })(4);
+    mintCode(4);
+  }
+
+  function mintCode(tries) {
+    var code = genCode();
+    function commit() {
+      publishCard(code);
+      Store.saveCrawlerCode(code, { uid: myUid() }).catch(idxWarn);
+      return Store.saveCharacter({ friendCode: code }).then(emit)
+        .catch(function (e) { console.warn('[qm] could not save friend code', e); });
+    }
+    Store.getCrawlerCode(code).then(function (ex) {
+      if (ex && ex.uid && ex.uid !== myUid() && tries > 0) return mintCode(tries - 1);
+      return commit();
+    }).catch(function () {
+      /* Directory read blocked (rules) — still stamp a code on our own character
+       * so it appears; the index write is attempted regardless and will land
+       * once the rules are deployed. */
+      commit();
+    });
   }
 
   function publishCard(code) {

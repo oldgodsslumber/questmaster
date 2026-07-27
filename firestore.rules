@@ -164,7 +164,13 @@ service cloud.firestore {
      * yourself, so nobody can hijack someone else's code. */
     match /crawlerCodes/{code} {
       allow read: if signedIn();
-      allow create, update: if signedIn() && request.resource.data.uid == request.auth.uid;
+      /* First writer claims the code (create only applies when the doc is
+       * absent). Only the current owner may change or drop it — otherwise any
+       * signed-in user could repoint someone else's code at themselves. */
+      allow create: if signedIn() && request.resource.data.uid == request.auth.uid;
+      allow update: if signedIn()
+        && resource.data.uid == request.auth.uid
+        && request.resource.data.uid == request.auth.uid;
       allow delete: if signedIn() && resource.data.uid == request.auth.uid;
     }
   }

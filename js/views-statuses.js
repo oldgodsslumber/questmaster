@@ -1,0 +1,211 @@
+/* Questmaster — buffs, debuffs and achievements (M3).
+ *
+ * Both feed the same modifier engine; the difference is that a status is
+ * temporary and self-inflicted, while an achievement is permanent and earned.
+ * Nothing here expires on a timer server-side — an expiry is just a timestamp
+ * the client compares against on render, which is why a stale buff quietly
+ * stops applying rather than needing a cron job to clean it up.
+ */
+window.ViewStatuses = (function () {
+
+  var tab = 'statuses';
+
+  function render(host) {
+    host.appendChild(el('div.tabs', {}, [
+      ['statuses', 'Buffs & Debuffs'], ['achievements', 'Achievements']
+    ].map(function (t) {
+      return el('button.tab' + (tab === t[0] ? '.on' : ''), {
+        onclick: function () { tab = t[0]; App.render(); }
+      }, t[1], el('span.tab-count', {}, Store.state[t[0]].length));
+    })));
+
+    if (tab === 'statuses') renderStatuses(host);
+    else renderAchievements(host);
+  }
+
+  /* ---- Statuses --------------------------------------------------------------- */
+
+  function renderStatuses(host) {
+    var now = Date.now();
+    var list = Store.state.statuses;
+    var active = list.filter(function (s) { return !s.expiresAt || s.expiresAt > now; });
+    var lapsed = list.filter(function (s) { return s.expiresAt && s.expiresAt <= now; });
+
+    if (!list.length) {
+      host.appendChild(emptyState('✨', 'Nothing applied',
+        'Apply a buff when something goes right, a debuff when it does not. Both feed straight into your effective stats.'));
+    }
+
+    if (active.length) {
+      host.appendChild(el('h2.section-h', {}, 'Active'));
+      active.forEach(function (s) { host.appendChild(statusRow(s, false)); });
+    }
+
+    if (lapsed.length) {
+      host.appendChild(el('h2.section-h', {}, 'Expired'));
+      host.appendChild(el('p.muted.small', {}, 'These no longer apply. Clear them out or extend them.'));
+      lapsed.forEach(function (s) { host.appendChild(statusRow(s, true)); });
+    }
+
+    host.appendChild(el('div.list-foot', {},
+      el('button.btn.primary', { onclick: function () { editStatus(null); } }, 'Apply a status')));
+  }
+
+  function statusRow(s, expired) {
+    return el('div.inv-row.status-row.' + s.polarity + (expired ? '.expired' : ''), {},
+      Icons.node(s.iconSlug, 'lg'),
+      el('div.inv-main', { onclick: function () { editStatus(s); } },
+        el('div.inv-name', {}, s.name,
+          el('span.pol-chip.' + s.polarity, {}, s.polarity === 'buff' ? 'Buff' : 'Debuff')),
+        s.description ? el('div.muted.small', {}, s.description) : null,
+        ModEditor.summary(s.modifiers),
+        el('div.muted.small', {},
+          'Applied ' + fmtDate(s.appliedAt) +
+          (s.expiresAt ? (expired ? ' · expired ' + fmtDate(s.expiresAt) : ' · expires ' + fmtUntil(s.expiresAt)) : ' · until cleared'))),
+      el('button.btn.tiny.ghost', { onclick: function () { clearStatus(s); } }, 'Clear'));
+  }
+
+  function clearStatus(s) {
+    Store.remove('statuses', s.id).then(function () {
+      Store.logEvent('status-cleared', s.name + ' cleared.');
+      toast(s.name + ' cleared.');
+      App.render();
+    });
+  }
+
+  function editStatus(s) {
+    var isNew = !s;
+    var name = textInput(s ? s.name : '', 'Adrenaline');
+    var desc = textArea(s ? s.description : '', '', 2);
+    var polarity = selectInput([
+      { value: 'buff', label: 'Buff' }, { value: 'debuff', label: 'Debuff' }
+    ], s ? s.polarity : 'buff');
+    var iconSlug = s ? s.iconSlug : null;
+    var iconCtl = Icons.iconField(iconSlug, function (v) { iconSlug = v; });
+    var mods = ModEditor.create(s ? s.modifiers : []);
+
+    var durMode = selectInput([
+      { value: 'none', label: 'Until I clear it' },
+      { value: 'mins', label: 'For a set time' }
+    ], s && s.expiresAt ? 'mins' : 'none');
+    var mins = numInput(s && s.expiresAt ? Math.max(1, Math.round((s.expiresAt - Date.now()) / 60000)) : 60, 1);
+    var minsWrap = field('Minutes from now', mins);
+    function syncDur() { minsWrap.style.display = durMode.value === 'mins' ? '' : 'none'; }
+    durMode.addEventListener('change', syncDur);
+
+    openModal({
+      title: isNew ? 'Apply a status' : 'Edit status',
+      body: el('div', {},
+        field('Name', name),
+        el('div.form-row', {}, field('Icon', iconCtl), field('Polarity', polarity)),
+        field('Description', desc),
+        field('Duration', durMode), minsWrap,
+        el('div.field', {},
+          el('span.field-label', {}, 'Modifiers'),
+          el('span.field-hint', {}, 'Debuffs are just negative values — the polarity is only for colour.'),
+          mods)),
+      actions: (isNew ? [] : [{
+        label: 'Clear', kind: 'danger', onClick: function () { clearStatus(s); }
+      }]).concat([
+        { label: 'Cancel', kind: 'ghost' },
+        {
+          label: isNew ? 'Apply' : 'Save', kind: 'primary', onClick: function () {
+            if (!name.value.trim()) { toast('A name is required.', 'bad'); return false; }
+            var patch = {
+              name: name.value.trim(),
+              description: desc.value.trim(),
+              polarity: polarity.value,
+              iconSlug: iconSlug,
+              modifiers: mods.getMods(),
+              expiresAt: durMode.value === 'mins'
+                ? Date.now() + (parseInt(mins.value, 10) || 60) * 60000
+                : null
+            };
+            if (isNew) patch.appliedAt = Date.now();
+
+            var op = isNew ? Store.add('statuses', patch) : Store.update('statuses', s.id, patch);
+            op.then(function () {
+              if (isNew) {
+                Store.logEvent('status-applied', patch.name + ' applied (' + patch.polarity + ').');
+                toast(patch.name + ' applied.');
+              }
+              App.render();
+            });
+          }
+        }
+      ])
+    });
+
+    syncDur();
+  }
+
+  /* ---- Achievements ------------------------------------------------------------ */
+
+  function renderAchievements(host) {
+    var list = Store.state.achievements;
+
+    host.appendChild(el('div.view-intro', {},
+      el('p.muted', {}, 'Permanent. Their modifiers always apply, whether or not anything is equipped. Award yourself one when you have genuinely earned it — nothing here checks.')));
+
+    if (!list.length) {
+      host.appendChild(emptyState('🏆', 'None yet', 'The System is watching, allegedly.'));
+    }
+
+    list.slice().sort(function (a, b) { return (b.earnedAt || 0) - (a.earnedAt || 0); }).forEach(function (a) {
+      host.appendChild(el('div.inv-row', {},
+        Icons.node(a.iconSlug, 'lg'),
+        el('div.inv-main', { onclick: function () { editAchievement(a); } },
+          el('div.inv-name', {}, a.name),
+          a.description ? el('div.muted.small', {}, a.description) : null,
+          ModEditor.summary(a.modifiers),
+          el('div.muted.small', {}, 'Earned ' + fmtDate(a.earnedAt)))));
+    });
+
+    host.appendChild(el('div.list-foot', {},
+      el('button.btn.primary', { onclick: function () { editAchievement(null); } }, 'Award an achievement')));
+  }
+
+  function editAchievement(a) {
+    var isNew = !a;
+    var name = textInput(a ? a.name : '', 'Thirty Days Unbroken');
+    var desc = textArea(a ? a.description : '', 'What you did to get it.', 2);
+    var iconSlug = a ? a.iconSlug : null;
+    var iconCtl = Icons.iconField(iconSlug, function (v) { iconSlug = v; });
+    var mods = ModEditor.create(a ? a.modifiers : []);
+
+    openModal({
+      title: isNew ? 'Award an achievement' : 'Edit achievement',
+      body: el('div', {},
+        field('Name', name),
+        field('Icon', iconCtl),
+        field('Description', desc),
+        el('div.field', {},
+          el('span.field-label', {}, 'Permanent modifiers'),
+          el('span.field-hint', {}, 'Optional — plenty of achievements are just a record.'),
+          mods)),
+      actions: (isNew ? [] : [{
+        label: 'Delete', kind: 'danger', onClick: function () { Store.remove('achievements', a.id).then(App.render); }
+      }]).concat([
+        { label: 'Cancel', kind: 'ghost' },
+        {
+          label: isNew ? 'Award' : 'Save', kind: 'primary', onClick: function () {
+            if (!name.value.trim()) { toast('A name is required.', 'bad'); return false; }
+            var patch = {
+              name: name.value.trim(),
+              description: desc.value.trim(),
+              iconSlug: iconSlug,
+              modifiers: mods.getMods()
+            };
+            if (isNew) {
+              Progress.grantAchievement(patch).then(App.render);
+              return;
+            }
+            Store.update('achievements', a.id, patch).then(App.render);
+          }
+        }
+      ])
+    });
+  }
+
+  return { render: render };
+})();

@@ -1,0 +1,18 @@
+# Questmaster has no build step — there is nothing generated to ignore except
+# stray tooling artifacts and OS/editor cruft.
+
+node_modules/
+package-lock.json
+
+# Firebase CLI local state
+.firebase/
+*.log
+firebase-debug.log
+firestore-debug.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/

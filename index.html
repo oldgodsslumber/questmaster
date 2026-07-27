@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0e1116">
+<meta name="description" content="Questmaster — a Dungeon Crawler Carl habit tracker. Real tasks, real character sheet.">
+<title>Questmaster</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/app.css?v=20260727a">
+</head>
+<body>
+
+<header class="topbar">
+  <span class="brand">QUESTMASTER</span>
+  <span class="build-tag" id="build-tag" title="Loaded build — if this looks stale, hard-refresh"></span>
+</header>
+
+<nav id="nav" hidden></nav>
+
+<main id="view"></main>
+
+<div id="modal-root"></div>
+<div id="toast"></div>
+
+<!-- html2canvas powers the character-sheet PNG export. Icons are inlined SVG
+     precisely so this never hits a tainted-canvas error. -->
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+
+<script src="js/config.js?v=20260727a"></script>
+<script src="js/util.js?v=20260727a"></script>
+<script src="js/engine.js?v=20260727a"></script>
+<script src="js/store.js?v=20260727a"></script>
+<script src="js/progress.js?v=20260727a"></script>
+<script src="js/icons.js?v=20260727a"></script>
+<script src="js/mod-editor.js?v=20260727a"></script>
+<script src="js/data-seed.js?v=20260727a"></script>
+<script src="js/data-build.js?v=20260727a"></script>
+<script src="js/views-create.js?v=20260727a"></script>
+<script src="js/views-sheet.js?v=20260727a"></script>
+<script src="js/views-quests.js?v=20260727a"></script>
+<script src="js/views-skills.js?v=20260727a"></script>
+<script src="js/views-inventory.js?v=20260727a"></script>
+<script src="js/views-statuses.js?v=20260727a"></script>
+<script src="js/views-build.js?v=20260727a"></script>
+<script src="js/views-journal.js?v=20260727a"></script>
+<script src="js/app.js?v=20260727a"></script>
+
+<!-- Module, so it loads after everything above and can use import syntax. -->
+<script type="module" src="js/firebase-config.js?v=20260727a"></script>
+
+</body>
+</html>

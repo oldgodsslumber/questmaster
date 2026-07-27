@@ -62,7 +62,18 @@ window.ViewStatuses = (function () {
         el('div.muted.small', {},
           'Applied ' + fmtDate(s.appliedAt) +
           (s.expiresAt ? (expired ? ' · expired ' + fmtDate(s.expiresAt) : ' · expires ' + fmtUntil(s.expiresAt)) : ' · until cleared'))),
-      el('button.btn.tiny.ghost', { onclick: function () { clearStatus(s); } }, 'Clear'));
+      el('div.row-actions', {},
+        (window.Party && Party.available()) ? el('button.btn.tiny.ghost', { onclick: function () { shareStatus(s); } }, 'Share') : null,
+        el('button.btn.tiny.ghost', { onclick: function () { clearStatus(s); } }, 'Clear')));
+  }
+
+  function shareStatus(s) {
+    var who = (Store.state.character && Store.state.character.name) || 'A crawler';
+    shareToFeedModal({
+      title: 'Share status',
+      message: who + (s.polarity === 'buff' ? ' gained the buff "' : ' took on the debuff "') + s.name + '".',
+      kind: 'status'
+    });
   }
 
   /* A status description rendered as Markdown, styled to match the old muted
@@ -187,11 +198,23 @@ window.ViewStatuses = (function () {
           el('div.inv-name', {}, a.name),
           a.description ? el('div.muted.small', {}, a.description) : null,
           ModEditor.summary(a.modifiers),
-          el('div.muted.small', {}, 'Earned ' + fmtDate(a.earnedAt)))));
+          el('div.muted.small', {}, 'Earned ' + fmtDate(a.earnedAt))),
+        (window.Party && Party.available())
+          ? el('div.row-actions', {}, el('button.btn.tiny.ghost', { onclick: function () { shareAchievement(a); } }, 'Share'))
+          : null));
     });
 
     host.appendChild(el('div.list-foot', {},
       el('button.btn.primary', { onclick: function () { editAchievement(null); } }, 'Award an achievement')));
+  }
+
+  function shareAchievement(a) {
+    var who = (Store.state.character && Store.state.character.name) || 'A crawler';
+    shareToFeedModal({
+      title: 'Share achievement',
+      message: who + ' earned the achievement "' + a.name + '". 🎖️',
+      kind: 'achievement'
+    });
   }
 
   function editAchievement(a) {

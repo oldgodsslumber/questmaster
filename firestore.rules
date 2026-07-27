@@ -157,6 +157,16 @@ service cloud.firestore {
     match /crawlers/{cuid} {
       allow read: if signedIn();
       allow write: if isOwner(cuid);
+
+      /* A crawler's personal wall — where "post to friends" lands. The owner
+       * writes it; anyone who has added this crawler as a friend (i.e. follows
+       * them) may read it, so their posts surface in that follower's feed. */
+      match /feed/{postId} {
+        allow read: if isOwner(cuid)
+          || (('friendUids' in myChar()) && (cuid in myChar().friendUids));
+        allow create: if isOwner(cuid) && request.resource.data.authorUid == request.auth.uid;
+        allow update, delete: if isOwner(cuid);
+      }
     }
 
     /* Friend-code index: CODE -> { uid }. Lets "add by friend code" resolve to a

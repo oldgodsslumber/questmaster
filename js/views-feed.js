@@ -1,42 +1,36 @@
-/* Questmaster — the party feed (M5), the newsfeed of the app.
+/* Questmaster — the feed (M5), the newsfeed of the app.
  *
- * One stream blended across every party you're in, each post labelled with its
- * party and filterable down to one. Quest turn-ins post themselves (Party.
- * autoPost); anyone can drop a manual line or push a journal entry across. A
- * live snapshot per party keeps it current without a refresh.
+ * One stream blended across your Friends and every party you're in, each post
+ * labelled with where it came from and filterable down to one. Quest turn-ins
+ * post themselves (Party.autoPost); anyone can drop a manual line, push a
+ * journal entry, or share a status/achievement across. Live snapshots keep it
+ * current without a refresh.
  */
 window.ViewFeed = (function () {
 
-  var filter = null;   /* null = all parties, or a party code */
+  var filter = null;   /* null = everything, 'friends', or a party code */
 
   function render(host) {
-    if (!Store.isCloud()) {
+    if (!Store.isCloud() || !Party.available()) {
       host.appendChild(el('section.card', {},
-        emptyState('📰', 'The feed is a party thing',
-          'Sign in with Google and join a party to share a feed. Your private journal works offline regardless.'),
-        el('div.list-foot', {}, el('a.btn.ghost', { href: '#/party' }, 'Go to Party'))));
+        emptyState('📰', 'The feed is a shared thing',
+          'Sign in with Google to get a Friends feed and join parties. Your private journal works offline regardless.'),
+        el('div.list-foot', {}, el('a.btn.ghost', { href: '#/party' }, 'Go to Party & Friends'))));
       return;
     }
 
     var parties = Party.partyList();
-    if (!parties.length) {
-      host.appendChild(el('section.card', {},
-        emptyState('📰', 'No party, no feed',
-          'Start or join a party and this becomes a shared stream of everyone\'s turn-ins and notes.'),
-        el('div.list-foot', {}, el('a.btn.primary', { href: '#/party' }, 'Find a party'))));
-      return;
-    }
 
-    /* Drop a stale filter if we left that party. */
-    if (filter && !parties.some(function (p) { return Party.codeOf(p) === filter; })) filter = null;
+    /* Drop a stale party filter if we left it. */
+    if (filter && filter !== 'friends' && !parties.some(function (p) { return Party.codeOf(p) === filter; })) filter = null;
 
-    if (parties.length > 1) host.appendChild(filterRow(parties));
-    host.appendChild(composer(parties));
+    if (parties.length) host.appendChild(filterRow(parties));
+    host.appendChild(composer());
 
     var posts = Party.combinedFeed(filter);
     if (!posts.length) {
       host.appendChild(emptyState('🌱', 'The feed is quiet',
-        'Turn in a shared quest, or post the first update above.'));
+        'Share a status or a note above, add friends on the Party tab, or turn in a shared quest.'));
       return;
     }
     host.appendChild(el('div.feed', {}, posts.map(postRow)));
@@ -44,33 +38,33 @@ window.ViewFeed = (function () {
 
   function filterRow(parties) {
     function chip(label, code) {
-      return el('button.feed-filter' + ((filter === code) ? '.on' : ''), {
+      return el('button.feed-filter' + (filter === code ? '.on' : ''), {
         onclick: function () { filter = code; App.render(); }
       }, label);
     }
-    return el('div.feed-filters', {}, [chip('All', null)].concat(
+    return el('div.feed-filters', {}, [chip('All', null), chip('Friends', 'friends')].concat(
       parties.map(function (p) { return chip(p.name, Party.codeOf(p)); })));
   }
 
-  function composer(parties) {
-    var area = textArea('', 'Say something to the party…', 2);
+  function composer() {
+    var area = textArea('', 'Say something…', 2);
     area.setAttribute('data-focus-key', 'feed-composer');
 
-    /* Where does a manual post land? If a filter is active, that party; else if
-     * there's only one party, it; otherwise a selector so it's never ambiguous. */
+    var dests = feedDestinations();       /* [friends, ...parties] */
     var targetSel = null;
-    var single = parties.length === 1 ? Party.codeOf(parties[0]) : null;
-    if (parties.length > 1 && !filter) {
-      targetSel = selectInput(parties.map(function (p) { return { value: Party.codeOf(p), label: p.name }; }), Party.codeOf(parties[0]));
+    if (dests.length > 1) {
+      var def = (filter && filter !== null) ? filter : dests[0].value;
+      if (!dests.some(function (d) { return d.value === def; })) def = dests[0].value;
+      targetSel = selectInput(dests.map(function (d) { return { value: d.value, label: d.label }; }), def);
     }
 
-    function target() { return filter || single || (targetSel && targetSel.value) || null; }
+    function target() { return targetSel ? targetSel.value : (dests[0] && dests[0].value) || null; }
 
     function send() {
       var body = area.value.trim();
       if (!body) return;
       var to = target();
-      if (!to) { toast('Pick a party to post to.', 'bad'); return; }
+      if (!to) { toast('Pick where to post.', 'bad'); return; }
       area.value = '';
       Party.post(body, 'manual', null, to)
         .then(function () { toast('Posted.'); })
@@ -82,7 +76,7 @@ window.ViewFeed = (function () {
       el('div.composer-foot', {},
         targetSel
           ? el('label.feed-target', {}, el('span.muted.small', {}, 'Post to'), targetSel)
-          : el('span.muted.small', {}, filter ? 'Posting to this party.' : 'Shared with your party in real time.'),
+          : el('span.muted.small', {}, 'Posting to your friends feed.'),
         el('button.btn.primary', { onclick: send }, 'Post')));
   }
 
@@ -104,7 +98,7 @@ window.ViewFeed = (function () {
           el('span.muted.small.feed-time', {}, fmtDate(p.createdAt)),
           mine ? el('button.icon-btn.subtle', {
             title: 'Delete post',
-            onclick: function () { Party.removePost(p._partyCode, p.id).catch(function () {}); }
+            onclick: function () { Party.removePost(p).catch(function () {}); }
           }, '✕') : null),
         el('div.feed-text', {}, p.body)));
   }

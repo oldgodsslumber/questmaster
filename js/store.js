@@ -429,6 +429,14 @@ window.Store = (function () {
   function getCrawlerCode(code) { return backend.getDoc(['crawlerCodes', code]); }
   function saveCrawlerCode(code, data) { return backend.setDoc(['crawlerCodes', code], data); }
 
+  /* Personal wall — where "post to friends" lands. crawlers/{uid}/feed. */
+  function addWallPost(cuid, data) {
+    var doc = Object.assign({ createdAt: Date.now() }, data);
+    return backend.addDoc(['crawlers', cuid, 'feed'], doc).then(function (id) { return Object.assign({ id: id }, doc); });
+  }
+  function removeWallPost(cuid, postId) { return backend.deleteDoc(['crawlers', cuid, 'feed', postId]); }
+  function subscribeWall(cuid, cb) { return backend.subscribeCollection(['crawlers', cuid, 'feed'], cb); }
+
   return {
     state: state,
     attach: attach, detach: detach, load: load, loadQuests: loadQuests,
@@ -444,6 +452,7 @@ window.Store = (function () {
     getParty: getParty, saveParty: saveParty, deleteParty: deleteParty, subscribeParty: subscribeParty,
     addFeedPost: addFeedPost, listFeed: listFeed, removeFeedPost: removeFeedPost, subscribeFeed: subscribeFeed,
     getCrawler: getCrawler, saveCrawler: saveCrawler, subscribeCrawler: subscribeCrawler,
-    getCrawlerCode: getCrawlerCode, saveCrawlerCode: saveCrawlerCode
+    getCrawlerCode: getCrawlerCode, saveCrawlerCode: saveCrawlerCode,
+    addWallPost: addWallPost, removeWallPost: removeWallPost, subscribeWall: subscribeWall
   };
 })();

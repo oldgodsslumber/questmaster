@@ -910,3 +910,6 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 .feed-target { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
 .feed-target select { max-width: 170px; }
 .party-card { margin-bottom: 12px; }
+
+/* Inline action buttons on status / achievement rows (Share, Clear). */
+.row-actions { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }

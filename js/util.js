@@ -297,29 +297,69 @@ function emptyState(icon, title, sub) {
     sub ? el('div.empty-sub', {}, sub) : null);
 }
 
-/* Shared control for opting a journal entry, status or achievement into a party
- * feed. Returns { node, target() }: target() is the chosen party code, or null
- * for "don't post". Renders nothing (and always targets null) when the crawler
- * is in no parties; a checkbox when in exactly one; a select when in several. */
+/* Where a post can go: your Friends feed (always available in cloud mode) plus
+ * each party you're in. Returns [{value, label}] — 'friends' or a party code. */
+function feedDestinations() {
+  if (!(window.Party && Party.available())) return [];
+  var dests = [{ value: 'friends', label: 'Friends' }];
+  Party.partyList().forEach(function (p) { dests.push({ value: Party.codeOf(p), label: p.name }); });
+  return dests;
+}
+
+/* Shared control for opting a journal entry, status or achievement into a feed
+ * as you create it. Returns { node, target() }: target() is the chosen
+ * destination ('friends' or a party code), or null for "don't post". Renders
+ * nothing off the cloud; a checkbox when Friends is the only destination; a
+ * select when there are several. */
 function partyPostControl(label) {
   var none = { node: null, target: function () { return null; } };
-  if (!(window.Party && Party.available() && Party.inAnyParty())) return none;
+  var dests = feedDestinations();
+  if (!dests.length) return none;
 
-  var parties = Party.partyList();
-  if (parties.length === 1) {
-    var code = Party.codeOf(parties[0]);
+  if (dests.length === 1) {
+    var only = dests[0].value;
     var cb = el('input', { type: 'checkbox' });
     return {
-      node: el('label.share-toggle', {}, cb, el('span', {}, label || ('Also post to ' + parties[0].name + ' feed'))),
-      target: function () { return cb.checked ? code : null; }
+      node: el('label.share-toggle', {}, cb, el('span', {}, label || 'Also post to your friends feed')),
+      target: function () { return cb.checked ? only : null; }
     };
   }
 
-  var sel = selectInput([{ value: '', label: "Don't post to a feed" }].concat(parties.map(function (p) {
-    return { value: Party.codeOf(p), label: 'Post to ' + p.name };
+  var sel = selectInput([{ value: '', label: "Don't post" }].concat(dests.map(function (d) {
+    return { value: d.value, label: 'Post to ' + d.label };
   })), '');
   return {
-    node: field(label || 'Share to a party feed', sel),
+    node: field(label || 'Share to a feed', sel),
     target: function () { return sel.value || null; }
   };
+}
+
+/* A modal for sharing something that already exists (a status, an achievement)
+ * to a feed. Pick a destination and it posts opts.message. */
+function shareToFeedModal(opts) {
+  opts = opts || {};
+  var dests = feedDestinations();
+  if (!dests.length) { toast('Sign in and add friends or a party to share.', 'bad'); return; }
+
+  var sel = dests.length > 1
+    ? selectInput(dests.map(function (d) { return { value: d.value, label: d.label }; }), dests[0].value)
+    : null;
+
+  openModal({
+    title: opts.title || 'Share',
+    body: el('div', {},
+      opts.message ? el('p.modal-text', {}, opts.message) : null,
+      sel ? field('Share to', sel) : el('p.muted.small', {}, 'Sharing to your friends feed.')),
+    actions: [
+      { label: 'Cancel', kind: 'ghost' },
+      {
+        label: 'Share', kind: 'primary', onClick: function () {
+          var to = sel ? sel.value : dests[0].value;
+          Party.post(opts.message, opts.kind || 'manual', null, to)
+            .then(function () { toast('Shared.'); })
+            .catch(function (e) { toast(e.message || 'Could not share.', 'bad'); });
+        }
+      }
+    ]
+  });
 }

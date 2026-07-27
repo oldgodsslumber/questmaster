@@ -29,6 +29,8 @@ window.Party = (function () {
   var unsubs = {};         /* code -> { party: fn, feed: fn } */
   var friendCards = {};    /* uid -> public crawler card */
   var friendUnsubs = {};   /* uid -> fn */
+  var walls = {};          /* uid -> [wall posts]: mine + each friend I follow */
+  var wallUnsubs = {};     /* uid -> fn */
   var listeners = [];
 
   /* ---- Availability & getters -------------------------------------------- */
@@ -102,7 +104,8 @@ window.Party = (function () {
 
     ensureIdentity();
     ids.forEach(connectParty);
-    (c.friendUids || []).forEach(watchFriend);
+    watchWall(myUid());                            /* my own wall */
+    (c.friendUids || []).forEach(function (uid) { watchFriend(uid); watchWall(uid); });
     emit();
     return Promise.resolve(null);
   }
@@ -110,7 +113,17 @@ window.Party = (function () {
   function teardown() {
     Object.keys(unsubs).forEach(function (code) { dropSubs(code); });
     Object.keys(friendUnsubs).forEach(function (uid) { try { friendUnsubs[uid](); } catch (e) {} });
-    parties = {}; feeds = {}; unsubs = {}; friendCards = {}; friendUnsubs = {};
+    Object.keys(wallUnsubs).forEach(function (uid) { try { wallUnsubs[uid](); } catch (e) {} });
+    parties = {}; feeds = {}; unsubs = {}; friendCards = {}; friendUnsubs = {}; walls = {}; wallUnsubs = {};
+  }
+
+  function watchWall(uid) {
+    if (wallUnsubs[uid]) return;
+    wallUnsubs[uid] = Store.subscribeWall(uid, function (posts) { walls[uid] = posts || []; emit(); });
+  }
+  function unwatchWall(uid) {
+    if (wallUnsubs[uid]) { try { wallUnsubs[uid](); } catch (e) {} delete wallUnsubs[uid]; }
+    delete walls[uid];
   }
   function detach() { teardown(); }
 
@@ -266,34 +279,56 @@ window.Party = (function () {
 
   /* ---- Feed -------------------------------------------------------------- */
 
-  /* One stream across every party, each post tagged with the party it came from
-   * so the view can label and filter it. Optional filter narrows to one party. */
-  function combinedFeed(filterCode) {
+  /* One stream across your parties AND your friends' walls, each post tagged
+   * with where it came from. filter is a party code, the string 'friends'
+   * (walls only), or null (everything). */
+  function combinedFeed(filter) {
     var out = [];
-    Object.keys(feeds).forEach(function (code) {
-      if (filterCode && filterCode !== code) return;
-      var pname = parties[code] ? parties[code].name : 'Party';
-      (feeds[code] || []).forEach(function (post) {
-        out.push(Object.assign({ _partyCode: code, _partyName: pname }, post));
+    if (filter === 'friends' || !filter) {
+      Object.keys(walls).forEach(function (uid) {
+        (walls[uid] || []).forEach(function (p) {
+          out.push(Object.assign({ _wallUid: uid, _partyName: 'Friends' }, p));
+        });
       });
-    });
+    }
+    if (filter !== 'friends') {
+      Object.keys(feeds).forEach(function (code) {
+        if (filter && filter !== code) return;
+        var pname = parties[code] ? parties[code].name : 'Party';
+        (feeds[code] || []).forEach(function (p) {
+          out.push(Object.assign({ _partyCode: code, _partyName: pname }, p));
+        });
+      });
+    }
     return out.sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
   }
 
-  function post(body, kind, extra, targetCode) {
-    var code = targetCode || (partyCount() === 1 ? codeOf(partyList()[0]) : null);
-    if (!code || !parties[code]) return Promise.reject(new Error('Pick a party to post to.'));
+  /* Post to a destination: 'friends' writes to your own wall (your followers see
+   * it); any other value is a party code. Every caller passes one target string,
+   * so friends and parties share the same path. */
+  function post(body, kind, extra, target) {
     var c = myChar();
     var doc = Object.assign({
       authorUid: myUid(), authorName: c.name || 'Crawler', authorLevel: c.level || 1,
       kind: kind || 'manual', body: body
     }, extra || {});
+
+    if (target === 'friends') {
+      if (!available()) return Promise.reject(new Error('Sign in to post to friends.'));
+      return Store.addWallPost(myUid(), doc);
+    }
+    var code = target || (partyCount() === 1 ? codeOf(partyList()[0]) : null);
+    if (!code || !parties[code]) return Promise.reject(new Error('Pick a destination to post to.'));
     return Store.addFeedPost(code, doc);
   }
 
-  function removePost(code, postId) {
-    if (!code) return Promise.resolve();
-    return Store.removeFeedPost(code, postId);
+  /* Delete a post given the post object — it knows whether it lives on your wall
+   * or in a party feed. */
+  function removePost(p) {
+    if (!p) return Promise.resolve();
+    if (p._wallUid != null) return Store.removeWallPost(p._wallUid, p.id);
+    if (p._partyCode) return Store.removeFeedPost(p._partyCode, p.id);
+    return Promise.resolve();
   }
 
   /* Called from Progress.completeQuest. A shared quest broadcasts its turn-in to
@@ -351,7 +386,7 @@ window.Party = (function () {
       var list = (myChar().friendUids || []).slice();
       if (list.indexOf(uid) !== -1) throw new Error('They are already on your friends list.');
       list.push(uid);
-      return Store.saveCharacter({ friendUids: list }).then(function () { watchFriend(uid); emit(); return uid; });
+      return Store.saveCharacter({ friendUids: list }).then(function () { watchFriend(uid); watchWall(uid); emit(); return uid; });
     });
   }
 
@@ -359,6 +394,7 @@ window.Party = (function () {
     var list = (myChar().friendUids || []).filter(function (u) { return u !== uid; });
     if (friendUnsubs[uid]) { try { friendUnsubs[uid](); } catch (e) {} delete friendUnsubs[uid]; }
     delete friendCards[uid];
+    unwatchWall(uid);
     return Store.saveCharacter({ friendUids: list }).then(function () { emit(); });
   }
 

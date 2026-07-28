@@ -104,10 +104,23 @@ window.ViewStatuses = (function () {
     });
   }
 
-  /* Label a feed target ('friends' or a party code) for the "posts to X" note. */
+  /* Label one or more feed targets for the "posts to X" note. Accepts a single
+   * value or an array. */
   function feedLabel(target) {
-    var d = feedDestinations().filter(function (x) { return x.value === target; })[0];
-    return d ? d.label : 'party';
+    var arr = Array.isArray(target) ? target : [target];
+    var dests = feedDestinations();
+    return arr.map(function (t) {
+      var d = dests.filter(function (x) { return x.value === t; })[0];
+      return d ? d.label : 'party';
+    }).join(', ');
+  }
+
+  /* Normalise a forced target (opts.forceTarget) to a non-empty array, or null
+   * if there's nothing to post to (so the optional picker is shown instead). */
+  function forcedTargets(v) {
+    if (!v) return null;
+    var arr = Array.isArray(v) ? v.filter(Boolean) : [v];
+    return arr.length ? arr : null;
   }
 
   /* editStatus(s, opts): opts.forceTarget makes a NEW status post to that feed
@@ -124,10 +137,10 @@ window.ViewStatuses = (function () {
     var iconCtl = Icons.iconField(iconSlug, function (v) { iconSlug = v; });
     var mods = ModEditor.create(s ? s.modifiers : [], { positiveOnly: true });
 
-    var forced = isNew && opts.forceTarget ? opts.forceTarget : null;
+    var forced = isNew ? forcedTargets(opts.forceTarget) : null;
     var share = forced
-      ? { node: el('p.muted.small', {}, 'Posts to your ' + feedLabel(forced) + ' feed.'), target: function () { return forced; } }
-      : (isNew ? partyPostControl('Also post to a party feed') : { node: null, target: function () { return null; } });
+      ? { node: el('p.muted.small', {}, 'Posts to ' + feedLabel(forced) + '.'), targets: function () { return forced; } }
+      : (isNew ? partyPostControl('Also post to a feed') : { node: null, targets: function () { return []; } });
 
     var durMode = selectInput([
       { value: 'none', label: 'Until I clear it' },
@@ -173,10 +186,10 @@ window.ViewStatuses = (function () {
             op.then(function () {
               if (isNew) {
                 Store.logEvent('status-applied', patch.name + ' applied (' + patch.polarity + ').');
-                var target = share.target();
-                if (target) {
+                var targets = share.targets();
+                if (targets.length) {
                   var who = (Store.state.character && Store.state.character.name) || 'A crawler';
-                  Party.post(who + (patch.polarity === 'buff' ? ' gained the buff "' : ' took on the debuff "') + patch.name + '".', 'status', { iconSlug: patch.iconSlug || null }, target)
+                  Party.post(who + (patch.polarity === 'buff' ? ' gained the buff "' : ' took on the debuff "') + patch.name + '".', 'status', { iconSlug: patch.iconSlug || null }, targets)
                     .catch(function () { toast('Applied, but the party post failed.', 'bad'); });
                 }
                 toast(patch.name + ' applied.');
@@ -274,10 +287,10 @@ window.ViewStatuses = (function () {
     var iconCtl = Icons.iconField(iconSlug, function (v) { iconSlug = v; });
     var mods = ModEditor.create(a ? a.modifiers : []);
 
-    var forced = isNew && opts.forceTarget ? opts.forceTarget : null;
+    var forced = isNew ? forcedTargets(opts.forceTarget) : null;
     var share = forced
-      ? { node: el('p.muted.small', {}, 'Announces on your ' + feedLabel(forced) + ' feed.'), target: function () { return forced; } }
-      : (isNew ? partyPostControl('Announce it on a party feed') : { node: null, target: function () { return null; } });
+      ? { node: el('p.muted.small', {}, 'Announces on ' + feedLabel(forced) + '.'), targets: function () { return forced; } }
+      : (isNew ? partyPostControl('Announce it on a feed') : { node: null, targets: function () { return []; } });
 
     openModal({
       title: isNew ? 'Award an achievement' : 'Edit achievement',
@@ -305,10 +318,10 @@ window.ViewStatuses = (function () {
             };
             if (isNew) {
               Progress.grantAchievement(patch).then(function () {
-                var target = share.target();
-                if (target) {
+                var targets = share.targets();
+                if (targets.length) {
                   var who = (Store.state.character && Store.state.character.name) || 'A crawler';
-                  Party.post(who + ' earned the achievement "' + patch.name + '". 🎖️', 'achievement', { iconSlug: patch.iconSlug || null }, target)
+                  Party.post(who + ' earned the achievement "' + patch.name + '". 🎖️', 'achievement', { iconSlug: patch.iconSlug || null }, targets)
                     .catch(function () {});
                 }
                 App.render();

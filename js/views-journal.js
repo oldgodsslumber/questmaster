@@ -127,15 +127,15 @@ window.ViewJournal = (function () {
         return;
       }
       var title = titleIn.value.trim();
-      var target = share.target();
-      Store.addEntry(currentId, { kind: 'manual', title: title || null, body: body, template: usedTemplate, postedToParty: !!target })
+      var targets = share.targets();
+      Store.addEntry(currentId, { kind: 'manual', title: title || null, body: body, template: usedTemplate, postedToParty: targets.length > 0 })
         .then(function () {
-          if (target) {
-            return Party.post(body, 'journal', title ? { title: title } : null, target).catch(function () { toast('Logged, but the party post failed.', 'bad'); });
+          if (targets.length) {
+            return Party.post(body, 'journal', title ? { title: title } : null, targets).catch(function () { toast('Logged, but the party post failed.', 'bad'); });
           }
         })
         .then(function () { return Store.loadEntries(currentId); })
-        .then(function () { toast(target ? 'Logged and shared.' : 'Logged.'); App.render(); });
+        .then(function () { toast(targets.length ? 'Logged and shared.' : 'Logged.'); App.render(); });
     }
 
     return el('section.card.composer', {},

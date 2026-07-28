@@ -306,31 +306,40 @@ function feedDestinations() {
   return dests;
 }
 
-/* Shared control for opting a journal entry, status or achievement into a feed
- * as you create it. Returns { node, target() }: target() is the chosen
- * destination ('friends' or a party code), or null for "don't post". Renders
- * nothing off the cloud; a checkbox when Friends is the only destination; a
- * select when there are several. */
-function partyPostControl(label) {
-  var none = { node: null, target: function () { return null; } };
+/* A row of checkboxes — one per feed destination (Friends + each party) — so a
+ * post can go to several at once. `preset` is an array of values to pre-check.
+ * Returns { node, targets() } where targets() is the array of checked values,
+ * and any() reports whether there are any destinations at all. */
+function feedTargetChecks(preset) {
   var dests = feedDestinations();
-  if (!dests.length) return none;
-
-  if (dests.length === 1) {
-    var only = dests[0].value;
+  var boxes = dests.map(function (d) {
     var cb = el('input', { type: 'checkbox' });
-    return {
-      node: el('label.share-toggle', {}, cb, el('span', {}, label || 'Also post to your friends feed')),
-      target: function () { return cb.checked ? only : null; }
-    };
-  }
-
-  var sel = selectInput([{ value: '', label: "Don't post" }].concat(dests.map(function (d) {
-    return { value: d.value, label: 'Post to ' + d.label };
-  })), '');
+    if (preset && preset.indexOf(d.value) !== -1) cb.checked = true;
+    return { value: d.value, cb: cb, node: el('label.dest-check', {}, cb, el('span', {}, d.label)) };
+  });
   return {
-    node: field(label || 'Share to a feed', sel),
-    target: function () { return sel.value || null; }
+    node: el('div.dest-checks', {}, boxes.map(function (b) { return b.node; })),
+    targets: function () { return boxes.filter(function (b) { return b.cb.checked; }).map(function (b) { return b.value; }); },
+    any: function () { return dests.length > 0; }
+  };
+}
+
+/* Shared control for opting a journal entry, status or achievement into a feed
+ * as you create it — now a set of checkboxes so it can post to one or more
+ * parties AND your friends at once. Returns { node, targets(), target() }:
+ * targets() is the array of chosen destinations ('friends' or party codes);
+ * target() returns just the first (legacy single-target callers). Renders
+ * nothing off the cloud. */
+function partyPostControl(label) {
+  var none = { node: null, target: function () { return null; }, targets: function () { return []; } };
+  var checks = feedTargetChecks(null);
+  if (!checks.any()) return none;
+  return {
+    node: el('div.field', {},
+      el('span.field-label', {}, label || 'Also post to a feed'),
+      checks.node),
+    targets: checks.targets,
+    target: function () { return checks.targets()[0] || null; }
   };
 }
 
@@ -341,20 +350,20 @@ function shareToFeedModal(opts) {
   var dests = feedDestinations();
   if (!dests.length) { toast('Sign in and add friends or a party to share.', 'bad'); return; }
 
-  var sel = dests.length > 1
-    ? selectInput(dests.map(function (d) { return { value: d.value, label: d.label }; }), dests[0].value)
-    : null;
+  var multi = dests.length > 1;
+  var checks = multi ? feedTargetChecks([dests[0].value]) : null;
 
   openModal({
     title: opts.title || 'Share',
     body: el('div', {},
       opts.message ? el('p.modal-text', {}, opts.message) : null,
-      sel ? field('Share to', sel) : el('p.muted.small', {}, 'Sharing to your friends feed.')),
+      checks ? field('Share to', checks.node) : el('p.muted.small', {}, 'Sharing to your friends feed.')),
     actions: [
       { label: 'Cancel', kind: 'ghost' },
       {
         label: 'Share', kind: 'primary', onClick: function () {
-          var to = sel ? sel.value : dests[0].value;
+          var to = checks ? checks.targets() : [dests[0].value];
+          if (!to.length) { toast('Check at least one feed to share to.', 'bad'); return false; }
           Party.post(opts.message, opts.kind || 'manual', null, to)
             .then(function () { toast('Shared.'); })
             .catch(function (e) { toast(e.message || 'Could not share.', 'bad'); });

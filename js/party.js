@@ -318,10 +318,19 @@ window.Party = (function () {
     return out.sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
   }
 
-  /* Post to a destination: 'friends' writes to your own wall (your followers see
-   * it); any other value is a party code. Every caller passes one target string,
-   * so friends and parties share the same path. */
+  /* Post to a destination, or to several at once. `target` may be a single value
+   * ('friends' or a party code) or an ARRAY of them — an array fans the same post
+   * out to every listed feed (each gets its own copy). */
   function post(body, kind, extra, target) {
+    if (Array.isArray(target)) {
+      var list = target.filter(Boolean);
+      if (!list.length) return Promise.reject(new Error('Pick where to post.'));
+      return Promise.all(list.map(function (t) { return postOne(body, kind, extra, t); }));
+    }
+    return postOne(body, kind, extra, target);
+  }
+
+  function postOne(body, kind, extra, target) {
     var c = myChar();
     var doc = Object.assign({
       authorUid: myUid(), authorName: c.name || 'Crawler', authorLevel: c.level || 1,

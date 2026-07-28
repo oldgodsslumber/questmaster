@@ -10,13 +10,14 @@ window.ViewFeed = (function () {
 
   var filter = null;   /* null = everything, 'friends', or a party code */
 
-  /* Where a new post/status/achievement should land from the Feed: the active
-   * filter if it's a postable destination, otherwise the first one (Friends). */
-  function defaultTarget() {
+  /* Which destinations a new post/status/achievement should pre-select from the
+   * Feed: the active filter if it's postable, otherwise the first one (Friends).
+   * Returns an ARRAY, since posts can now go to several feeds at once. */
+  function defaultTargets() {
     var dests = feedDestinations();
-    if (!dests.length) return null;
-    if (filter && dests.some(function (d) { return d.value === filter; })) return filter;
-    return dests[0].value;
+    if (!dests.length) return [];
+    if (filter && dests.some(function (d) { return d.value === filter; })) return [filter];
+    return [dests[0].value];
   }
 
   function render(host) {
@@ -24,7 +25,7 @@ window.ViewFeed = (function () {
      * Feed too, folded into a collapsible so they don't crowd the stream. */
     if (window.ViewStatuses) {
       var statusBox = el('div');
-      ViewStatuses.panel(statusBox, { postTarget: defaultTarget() });
+      ViewStatuses.panel(statusBox, { postTarget: defaultTargets() });
       host.appendChild(el('details.feed-status', {},
         el('summary', {}, 'Your buffs, debuffs & achievements'), statusBox));
     }
@@ -69,41 +70,37 @@ window.ViewFeed = (function () {
     area.setAttribute('data-focus-key', 'feed-composer');
 
     var dests = feedDestinations();       /* [friends, ...parties] */
-    var targetSel = null;
-    if (dests.length > 1) {
-      var def = (filter && filter !== null) ? filter : dests[0].value;
-      if (!dests.some(function (d) { return d.value === def; })) def = dests[0].value;
-      targetSel = selectInput(dests.map(function (d) { return { value: d.value, label: d.label }; }), def);
-    }
+    /* Checkboxes so a post can go to one or more parties AND friends at once. */
+    var checks = feedTargetChecks(defaultTargets());
 
-    function target() { return targetSel ? targetSel.value : (dests[0] && dests[0].value) || null; }
+    function targets() { return checks.targets(); }
 
     function send() {
       var body = area.value.trim();
       if (!body) return;
-      var to = target();
-      if (!to) { toast('Pick where to post.', 'bad'); return; }
+      var to = targets();
+      if (!to.length) { toast('Pick where to post.', 'bad'); return; }
       area.value = '';
       Party.post(body, 'manual', null, to)
-        .then(function () { toast('Posted.'); })
+        .then(function () { toast(to.length > 1 ? 'Posted to ' + to.length + ' feeds.' : 'Posted.'); })
         .catch(function (e) { toast(e.message || 'Could not post.', 'bad'); });
     }
 
     return el('section.card.composer', {},
       area,
       el('div.composer-foot', {},
-        targetSel
-          ? el('label.feed-target', {}, el('span.muted.small', {}, 'Post to'), targetSel)
+        dests.length > 1
+          ? el('div.feed-target', {}, el('span.muted.small', {}, 'Post to'), checks.node)
           : el('span.muted.small', {}, 'Posting to your friends feed.'),
         el('button.btn.primary', { onclick: send }, 'Post')),
       /* Post a buff/debuff, achievement, kit item, or stat straight to the feed —
-       * each carries its own game-icon and announces to the destination above. */
+       * each carries its own game-icon and announces to the checked feeds above. */
       el('div.feed-quickpost', {},
         el('span.muted.small', {}, 'Or post a:'),
-        el('button.btn.tiny.ghost', { onclick: function () { ViewStatuses.newStatus(target()); } }, '✨ Buff / Debuff'),
-        el('button.btn.tiny.ghost', { onclick: function () { ViewStatuses.newAchievement(target()); } }, '🎖️ Achievement'),
-        el('button.btn.tiny.ghost', { onclick: function () { shareItem(target()); } }, '🎒 Item'),
-        el('button.btn.tiny.ghost', { onclick: function () { shareStat(target()); } }, '📊 Stat')));
+        el('button.btn.tiny.ghost', { onclick: function () { ViewStatuses.newStatus(targets()); } }, '✨ Buff / Debuff'),
+        el('button.btn.tiny.ghost', { onclick: function () { ViewStatuses.newAchievement(targets()); } }, '🎖️ Achievement'),
+        el('button.btn.tiny.ghost', { onclick: function () { shareItem(targets()); } }, '🎒 Item'),
+        el('button.btn.tiny.ghost', { onclick: function () { shareStat(targets()); } }, '📊 Stat')));
   }
 
   /* ---- Sharing a kit item or a stat to the feed --------------------------- */
@@ -111,7 +108,7 @@ window.ViewFeed = (function () {
   /* Push one line to a destination, tagged with the entity's game-icon so the
    * feed avatar shows the item/stat's own art rather than a generic glyph. */
   function postEntity(body, kind, iconSlug, to) {
-    if (!to) { toast('Pick where to post.', 'bad'); return; }
+    if (!to || (Array.isArray(to) && !to.length)) { toast('Check at least one feed to post to.', 'bad'); return; }
     Party.post(body, kind, { iconSlug: iconSlug || null }, to)
       .then(function () { toast('Posted.'); })
       .catch(function (e) { toast(e.message || 'Could not post.', 'bad'); });

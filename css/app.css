@@ -921,8 +921,13 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 .feed-filter:hover { border-color: var(--line-2); }
 .feed-filter.on { background: rgba(212, 160, 39, .12); border-color: var(--accent); color: var(--accent); }
 .feed-party-tag { font-family: var(--mono); font-size: .58rem; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-3); border: 1px solid var(--line-2); border-radius: 4px; padding: 1px 5px; }
-.feed-target { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+.feed-target { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; flex-wrap: wrap; }
 .feed-target select { max-width: 170px; }
+
+/* Multi-select feed destinations — post to one or more parties + friends. */
+.dest-checks { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.dest-check { display: inline-flex; align-items: center; gap: 6px; font-size: .82rem; color: var(--ink-2); cursor: pointer; white-space: nowrap; }
+.dest-check input { accent-color: var(--accent); width: 15px; height: 15px; }
 .party-card { margin-bottom: 12px; }
 
 /* Inline action buttons on status / achievement rows (Share, Clear). */

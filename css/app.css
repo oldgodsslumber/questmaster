@@ -646,6 +646,15 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 .task-list > .task-row:last-child { border-bottom: none; }
 .task-row.done .task-title { text-decoration: line-through; color: var(--ink-3); }
 
+/* Drag-to-reorder handle. touch-action:none lets a touch drag the row instead
+   of scrolling the page. The grip sits before the checkbox. */
+.drag-handle {
+  flex: 0 0 auto; cursor: grab; touch-action: none; user-select: none;
+  color: var(--ink-3); font-size: 1rem; line-height: 1; padding: 2px 1px; margin: -2px -2px -2px -4px;
+}
+.drag-handle:active { cursor: grabbing; }
+[data-task-id].dragging { opacity: .55; background: var(--panel-2); border-radius: 8px; }
+
 .check {
   width: 27px; height: 27px; flex: 0 0 auto; cursor: pointer;
   border-radius: 7px; border: 2px solid var(--line-2); background: transparent;

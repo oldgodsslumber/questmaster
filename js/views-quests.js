@@ -119,10 +119,13 @@ window.ViewQuests = (function () {
     }
 
     if (open) {
-      card.appendChild(el('div.task-list', {},
-        (q.tasks || []).length
+      var hasTasks = (q.tasks || []).length;
+      var listEl = el('div.task-list', {},
+        hasTasks
           ? q.tasks.map(function (t) { return taskRow(q, t); })
-          : el('p.muted.small.pad', {}, 'This quest has no tasks yet. Add one below.')));
+          : el('p.muted.small.pad', {}, 'This quest has no tasks yet. Add one below.'));
+      card.appendChild(listEl);
+      if (hasTasks) enableTaskDrag(listEl, q);
 
       card.appendChild(el('div.quest-actions', {},
         el('button.btn.tiny.primary', { onclick: function () { editTask(q, null); } }, 'Add task'),
@@ -153,7 +156,10 @@ window.ViewQuests = (function () {
     var subs = t.subtasks || [];
     var subsDone = subs.filter(function (st) { return st.done; }).length;
 
+    var handle = el('span.drag-handle', { title: 'Drag to reorder', 'aria-label': 'Drag to reorder' }, '⠿');
+
     var row = el('div.task-row' + (t.done ? '.done' : ''), {},
+      handle,
       el('button.check' + (t.done ? '.on' : ''), {
         'aria-label': t.done ? 'Mark undone' : 'Mark done',
         onclick: function () { toggleTask(q, t); }
@@ -171,9 +177,7 @@ window.ViewQuests = (function () {
         onclick: function () { deleteTask(q, t); }
       }, '✕'));
 
-    if (!subs.length) return row;
-
-    return el('div.task-block', {}, row,
+    var node = !subs.length ? row : el('div.task-block', {}, row,
       el('div.subtask-list', {}, subs.map(function (st, i) {
         return el('div.subtask' + (st.done ? '.done' : ''), {},
           el('button.check.sm' + (st.done ? '.on' : ''), {
@@ -181,6 +185,69 @@ window.ViewQuests = (function () {
           }, st.done ? '✓' : ''),
           el('span', {}, st.title));
       })));
+
+    node.setAttribute('data-task-id', t.id);
+    node._dragHandle = handle;   /* enableTaskDrag wires this handle to move node */
+    return node;
+  }
+
+  /* Pointer-based drag reorder — works with touch and mouse. Only the handle
+   * starts a drag (so tapping a row still edits it); the node follows the
+   * pointer by re-inserting among its siblings, and the new order is written to
+   * each task's `order` on drop. */
+  function enableTaskDrag(listEl, q) {
+    var items = Array.prototype.slice.call(listEl.querySelectorAll(':scope > [data-task-id]'));
+    items.forEach(function (node) {
+      var handle = node._dragHandle;
+      if (!handle) return;
+      handle.addEventListener('pointerdown', function (e) {
+        e.preventDefault();
+        try { handle.setPointerCapture(e.pointerId); } catch (err) {}
+        node.classList.add('dragging');
+
+        function onMove(ev) {
+          var y = ev.clientY;
+          var sibs = Array.prototype.slice.call(listEl.querySelectorAll(':scope > [data-task-id]'))
+            .filter(function (n) { return n !== node; });
+          var before = null;
+          for (var i = 0; i < sibs.length; i++) {
+            var r = sibs[i].getBoundingClientRect();
+            if (y < r.top + r.height / 2) { before = sibs[i]; break; }
+          }
+          if (before) listEl.insertBefore(node, before);
+          else listEl.appendChild(node);
+        }
+        function onUp() {
+          document.removeEventListener('pointermove', onMove);
+          document.removeEventListener('pointerup', onUp);
+          document.removeEventListener('pointercancel', onUp);
+          node.classList.remove('dragging');
+          commitTaskOrder(listEl, q);
+        }
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup', onUp);
+        document.addEventListener('pointercancel', onUp);
+      });
+    });
+  }
+
+  /* Read the DOM order back into q.tasks and persist each task's index. */
+  function commitTaskOrder(listEl, q) {
+    var ids = Array.prototype.slice.call(listEl.querySelectorAll(':scope > [data-task-id]'))
+      .map(function (n) { return n.getAttribute('data-task-id'); });
+    var byId = {};
+    (q.tasks || []).forEach(function (t) { byId[t.id] = t; });
+    var ordered = ids.map(function (id) { return byId[id]; }).filter(Boolean);
+    (q.tasks || []).forEach(function (t) { if (ids.indexOf(t.id) === -1) ordered.push(t); });
+
+    var changed = ordered.some(function (t, i) { return t.order !== i; });
+    q.tasks = ordered;
+    if (!changed) return;
+
+    var writes = ordered.map(function (t, i) {
+      return t.order === i ? null : Store.updateTask(q.id, t.id, { order: i });
+    }).filter(Boolean);
+    Promise.all(writes).then(function () { App.render(); }).catch(function () { App.render(); });
   }
 
   function trainLabel(target) {

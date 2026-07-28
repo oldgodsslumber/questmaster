@@ -265,8 +265,18 @@ window.Progress = (function () {
       var keptStreak = (wasComplete && span.periods <= 1) ? (q.streak || 0) : 0;
       var brokeByGap = wasComplete && span.periods > 1 && (q.streak || 0) > 0;
 
-      var taskWrites = (q.tasks || []).filter(function (t) { return t.done; })
-        .map(function (t) { return Store.updateTask(q.id, t.id, { done: false, completedBy: null, completedAt: null }); });
+      /* A new period wipes the whole task clean — its own done flag AND every
+       * subtask's, since subtasks are the steps of a task that repeats with it.
+       * Reset a task if it's done OR any of its subtasks are checked. */
+      var taskWrites = (q.tasks || []).filter(function (t) {
+        return t.done || (t.subtasks || []).some(function (s) { return s.done; });
+      }).map(function (t) {
+        var patch = { done: false, completedBy: null, completedAt: null };
+        if ((t.subtasks || []).some(function (s) { return s.done; })) {
+          patch.subtasks = (t.subtasks || []).map(function (s) { return Object.assign({}, s, { done: false }); });
+        }
+        return Store.updateTask(q.id, t.id, patch);
+      });
 
       return Promise.all(taskWrites).then(function () {
         return Store.updateQuest(q.id, {

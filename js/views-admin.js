@@ -14,6 +14,7 @@ window.ViewAdmin = (function () {
   var TYPES = [
     { kind: 'world-system', label: 'System message', emoji: '🛠️', hint: 'Ops and status notices in the voice of the System.' },
     { kind: 'world-ai', label: 'AI world message', emoji: '🤖', hint: 'The dungeon AI speaking — lore, taunts, world events.' },
+    { kind: 'world-showrunner', label: 'Showrunner announcement', emoji: '🎬', hint: 'The Showrunner addressing the crawl — hype, ratings, prize drops.' },
     { kind: 'world-quest', label: 'World Quest', emoji: '⚔️', hint: 'A shared objective every crawler can accept and complete.' }
   ];
 
@@ -26,7 +27,10 @@ window.ViewAdmin = (function () {
 
   /* Shared colour class, used by both this panel and the feed post. */
   function worldClass(kind) {
-    return kind === 'world-ai' ? 'wc-ai' : kind === 'world-quest' ? 'wc-quest' : 'wc-system';
+    return kind === 'world-ai' ? 'wc-ai'
+      : kind === 'world-showrunner' ? 'wc-showrunner'
+      : kind === 'world-quest' ? 'wc-quest'
+      : 'wc-system';
   }
 
   function render(host) {

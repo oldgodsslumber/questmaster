@@ -963,18 +963,20 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 /* ---- World broadcasts (system / AI / world quest) ----------------------- */
 /* Each type owns a colour, shared by the feed post, the admin list, and the
    admin composer preview via the --wc custom property. */
-.wc-system { --wc: #ff5470; }   /* System — alert red      */
-.wc-ai     { --wc: #b57bff; }   /* AI world — arcane violet */
-.wc-quest  { --wc: #ffb63a; }   /* World Quest — quest gold */
+.wc-system     { --wc: #ff5470; }   /* System — alert red        */
+.wc-ai         { --wc: #b57bff; }   /* AI world — arcane violet  */
+.wc-showrunner { --wc: #34d6b0; }   /* Showrunner — broadcast teal */
+.wc-quest      { --wc: #ffb63a; }   /* World Quest — quest gold   */
 
-.feed-post.wc-system, .wc-item.wc-system, .wc-preview.wc-system { background: rgba(255, 84, 112, .10); }
-.feed-post.wc-ai,     .wc-item.wc-ai,     .wc-preview.wc-ai     { background: rgba(181, 123, 255, .10); }
-.feed-post.wc-quest,  .wc-item.wc-quest,  .wc-preview.wc-quest  { background: rgba(255, 182, 58, .12); }
+.feed-post.wc-system,     .wc-item.wc-system,     .wc-preview.wc-system     { background: rgba(255, 84, 112, .10); }
+.feed-post.wc-ai,         .wc-item.wc-ai,         .wc-preview.wc-ai         { background: rgba(181, 123, 255, .10); }
+.feed-post.wc-showrunner, .wc-item.wc-showrunner, .wc-preview.wc-showrunner { background: rgba(52, 214, 176, .10); }
+.feed-post.wc-quest,      .wc-item.wc-quest,      .wc-preview.wc-quest      { background: rgba(255, 182, 58, .12); }
 
-.feed-post.wc-system, .feed-post.wc-ai, .feed-post.wc-quest {
+.feed-post.wc-system, .feed-post.wc-ai, .feed-post.wc-showrunner, .feed-post.wc-quest {
   border-left: 3px solid var(--wc); border-radius: 10px; padding: 10px 10px 10px 9px;
 }
-.feed-post.wc-system .feed-avatar, .feed-post.wc-ai .feed-avatar, .feed-post.wc-quest .feed-avatar {
+.feed-post.wc-system .feed-avatar, .feed-post.wc-ai .feed-avatar, .feed-post.wc-showrunner .feed-avatar, .feed-post.wc-quest .feed-avatar {
   color: var(--wc); border-color: var(--wc);
 }
 .feed-world-title { font-weight: 700; color: var(--wc); margin-bottom: 2px; }

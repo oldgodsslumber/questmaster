@@ -160,7 +160,7 @@ window.ViewFeed = (function () {
   function capitalize(s) { s = String(s || ''); return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
 
   var KIND_ICON = { 'quest-complete': '🏆', 'achievement': '🎖️', 'status': '✨', 'journal': '📖', 'item': '🎒', 'skill': '📊',
-    'world-system': '🛠️', 'world-ai': '🤖', 'world-quest': '⚔️' };
+    'world-system': '🛠️', 'world-ai': '🤖', 'world-showrunner': '🎬', 'world-quest': '⚔️' };
   var SYSTEM_KIND = { 'quest-complete': 1, 'achievement': 1, 'status': 1, 'item': 1, 'skill': 1 };
 
   function postRow(p) {

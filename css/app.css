@@ -672,7 +672,7 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 
 /* ---- Inventory / lists ----------------------------------------------------------------- */
 
-.tabs { display: flex; gap: 5px; overflow-x: auto; padding-bottom: 2px; }
+.tabs { display: flex; flex-wrap: wrap; gap: 5px; padding-bottom: 2px; }
 .tab {
   display: flex; align-items: center; gap: 6px; white-space: nowrap;
   padding: 8px 14px; border-radius: var(--r-sm); cursor: pointer;
@@ -680,6 +680,9 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
   font-size: .86rem; font-weight: 500;
 }
 .tab.on { background: var(--panel-2); border-color: var(--accent); color: var(--accent); }
+/* A tab holding unopened loot boxes draws the eye so the reward isn't missed. */
+.tab.has-loot { border-color: var(--gold, #ffb63a); color: var(--gold, #ffb63a); }
+.tab.has-loot .tab-count { opacity: 1; background: var(--gold, #ffb63a); color: #1a1205; border-radius: 8px; padding: 1px 6px; }
 .tab-count { font-family: var(--mono); font-size: .64rem; opacity: .7; }
 .tab.add { padding: 8px 13px; font-size: 1rem; }
 

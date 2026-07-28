@@ -15,9 +15,13 @@ window.ViewInventory = (function () {
     host.appendChild(el('div.tabs', {}, [
       ['equipment', 'Equipment'], ['items', 'Items'], ['spells', 'Spells'], ['abilities', 'Skills'], ['lootboxes', 'Boxes']
     ].map(function (t) {
-      return el('button.tab' + (tab === t[0] ? '.on' : ''), {
+      var count = (Store.state[t[0]] || []).length;
+      /* Flag the Boxes tab when it's holding unopened loot, so a reward earned
+       * from a quest is impossible to miss even with several tabs. */
+      var hot = t[0] === 'lootboxes' && count > 0 ? '.has-loot' : '';
+      return el('button.tab' + (tab === t[0] ? '.on' : '') + hot, {
         onclick: function () { tab = t[0]; App.render(); }
-      }, t[1], el('span.tab-count', {}, (Store.state[t[0]] || []).length));
+      }, t[1], el('span.tab-count', {}, count));
     })));
 
     if (tab === 'equipment') renderEquipment(host);

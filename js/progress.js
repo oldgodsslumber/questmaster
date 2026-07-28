@@ -175,7 +175,7 @@ window.Progress = (function () {
       if (window.Loot) {
         Loot.awardBoxForQuest(quest).then(function (tier) {
           var meta = Loot.boxMeta(tier);
-          fanfare(meta.label + ' earned', 'Open it in your Kit');
+          fanfare(meta.label + ' earned', 'Open it in your Kit → Boxes tab');
           Store.logEvent('loot-box', 'Earned a ' + meta.label + ' from "' + quest.title + '".');
         }).catch(function (e) { console.warn('[qm] box award failed', e); });
       }

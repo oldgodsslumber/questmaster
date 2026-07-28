@@ -6,7 +6,7 @@
  */
 window.CONFIG = {
 
-  build: '20260727s',
+  build: '20260727t',
 
   /* ---- Admin ----------------------------------------------------------- */
 
@@ -63,9 +63,10 @@ window.CONFIG = {
    * the habit-tracker adaptation: tasks pay XP, XP pays levels.
    *
    * Tuning target is roughly one level per week. A daily quest with four tasks
-   * pays 4*10 + 30 = 70/day = ~490/week, which lands near the early curve. */
-  xpPerTaskDefault: 10,
-  questBonusXpDefault: 30,
+   * pays 4*5 + 15 = 35/day = ~245/week. Halved from the original 10/30 — the
+   * old rate levelled crawlers up too fast. */
+  xpPerTaskDefault: 5,
+  questBonusXpDefault: 15,
   xpForLevel: function (level) { return Math.round(400 * Math.pow(level, 1.12)); },
   attributePointsPerLevel: 2,
   levelMax: 99,

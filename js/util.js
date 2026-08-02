@@ -166,11 +166,15 @@ function toast(msg, kind) {
 }
 
 /* An achievement-style banner, louder than a toast. Used for level-ups,
- * rank-ups and quest completions. */
-function fanfare(title, sub) {
+ * rank-ups, quest completions — and death, which passes an icon slug so the
+ * grave-flowers headstone rides along. The icon is inlined as real SVG via
+ * Icons.node (never an <img>), keeping PNG export untainted. */
+function fanfare(title, sub, iconSlug) {
   var root = document.getElementById('toast');
   if (!root) return;
-  var t = el('div.fanfare', {},
+  var icon = (iconSlug && window.Icons && Icons.node) ? el('div.fanfare-icon', {}, Icons.node(iconSlug, 'lg')) : null;
+  var t = el('div.fanfare' + (icon ? '.has-icon' : ''), {},
+    icon,
     el('div.fanfare-title', {}, title),
     sub ? el('div.fanfare-sub', {}, sub) : null);
   root.appendChild(t);

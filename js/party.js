@@ -369,6 +369,28 @@ window.Party = (function () {
       .catch(function (e) { console.warn('[qm] party auto-post failed', e); });
   }
 
+  /* Called from Progress.failQuest. A shared quest's failure posts to its party,
+   * so the crawl sees the fall the same way it sees the turn-in. */
+  function autoPostFail(quest, priorStreak) {
+    if (!available()) return;
+    if (quest.visibility !== 'party' && quest.visibility !== 'shared') return;
+    var code = quest.partyId;
+    if (!code || !parties[code]) return;
+    var name = (myChar().name) || 'A crawler';
+    var body = name + ' fell to "' + quest.title + '"' +
+      (priorStreak > 1 ? ' — a ' + priorStreak + '-streak, gone. 💀' : '. 💀');
+    post(body, 'quest-failed', { questTitle: quest.title }, code)
+      .catch(function (e) { console.warn('[qm] party fail-post failed', e); });
+  }
+
+  /* Fan a post out to EVERY feed we're in (friends + all parties) — used for
+   * crawl-wide events like death that aren't tied to one party. Best-effort. */
+  function broadcast(body, kind, extra) {
+    if (!available()) return Promise.resolve();
+    var dests = ['friends'].concat(partyList().map(function (p) { return codeOf(p); }));
+    return post(body, kind, extra, dests).catch(function () {});
+  }
+
   /* ---- Friends ----------------------------------------------------------- */
 
   function watchFriend(uid) {
@@ -471,6 +493,7 @@ window.Party = (function () {
     createParty: createParty, joinByCode: joinByCode, leaveParty: leaveParty,
     /* feed */
     combinedFeed: combinedFeed, post: post, removePost: removePost, autoPost: autoPost,
+    autoPostFail: autoPostFail, broadcast: broadcast,
     /* friends */
     myFriendCode: myFriendCode, friends: friends, addFriendByCode: addFriendByCode, removeFriend: removeFriend,
     /* world broadcasts */

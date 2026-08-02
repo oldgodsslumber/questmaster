@@ -12,18 +12,33 @@ window.ViewQuests = (function () {
 
   var expanded = {};       /* questId -> bool, survives re-renders */
   var showArchived = false;
+  var showFailed = false;
+
+  /* ms → a local 'YYYY-MM-DDTHH:MM' string for a datetime-local input (and '' for
+   * no deadline). Local, not UTC, to match the app's local-time reset rule. */
+  function dtLocal(ms) {
+    if (!ms) return '';
+    var d = new Date(ms), p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + 'T' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
 
   function render(host) {
     host.appendChild(quickAdd());
 
     var quests = Store.state.quests.filter(function (q) {
-      return showArchived ? q.status === 'archived' : q.status !== 'archived';
+      if (showArchived) return q.status === 'archived';
+      if (showFailed) return q.status === 'failed';
+      /* Default view hides both archived and failed quests. */
+      return q.status !== 'archived' && q.status !== 'failed';
     });
 
+    var failedCount = Store.state.quests.filter(function (q) { return q.status === 'failed'; }).length;
+
     if (!quests.length) {
-      host.appendChild(emptyState('🗺️',
-        showArchived ? 'Nothing archived' : 'No quests yet',
-        showArchived ? null : 'Type something above to quick-add, or use New Quest for one with a cadence.'));
+      host.appendChild(emptyState(
+        showFailed ? '💀' : '🗺️',
+        showArchived ? 'Nothing archived' : showFailed ? 'No failed quests' : 'No quests yet',
+        (showArchived || showFailed) ? null : 'Type something above to quick-add, or use New Quest for one with a cadence.'));
     }
 
     CONFIG.cadences.forEach(function (cadence) {
@@ -47,8 +62,11 @@ window.ViewQuests = (function () {
     host.appendChild(el('div.quest-foot', {},
       el('button.btn.primary', { onclick: function () { editQuest(null); } }, 'New Quest'),
       el('button.btn.ghost', {
-        onclick: function () { showArchived = !showArchived; App.render(); }
-      }, showArchived ? 'Show active' : 'Show archived')));
+        onclick: function () { showArchived = !showArchived; showFailed = false; App.render(); }
+      }, showArchived ? 'Show active' : 'Show archived'),
+      (failedCount || showFailed) ? el('button.btn.ghost', {
+        onclick: function () { showFailed = !showFailed; showArchived = false; App.render(); }
+      }, showFailed ? 'Show active' : 'Show failed (' + failedCount + ')') : null));
   }
 
   /* ---- Quick add -------------------------------------------------------------- */
@@ -92,6 +110,7 @@ window.ViewQuests = (function () {
     var prog = Engine.questProgress(q.tasks);
     var open = !!expanded[q.id];
     var complete = prog.complete;
+    var failed = q.status === 'failed';
 
     var head = el('div.quest-head', {
       onclick: function () { expanded[q.id] = !open; App.render(); }
@@ -101,21 +120,39 @@ window.ViewQuests = (function () {
         el('div.quest-title-row', {},
           el('span.quest-title', {}, q.title),
           q.streak > 0 ? el('span.streak', { title: 'Best: ' + (q.bestStreak || q.streak) }, '🔥 ' + q.streak) : null,
+          q.penaltyEnabled ? el('span.penalty-badge', { title: 'Neglecting this quest costs health.' }, '☠') : null,
           el('span.vis-badge.' + (q.visibility || 'private'), { title: visTitle(q) }, visLabel(q))),
         q.description ? el('div.quest-desc', {}, q.description) : null,
         el('div.quest-progress', {},
           bar(prog.pct, complete ? 'done' : 'quest'),
           el('span.quest-count', {}, prog.total ? prog.done + '/' + prog.total : 'no tasks'))),
       el('div.quest-side', {},
-        complete ? el('span.done-chip', {}, '✓') : null,
+        failed ? el('span.failed-chip', {}, '✗') : complete ? el('span.done-chip', {}, '✓') : null,
         el('span.caret' + (open ? '.open' : ''), {}, '▾')));
 
-    var card = el('section.quest-card' + (complete ? '.complete' : '') + (open ? '.open' : ''), {}, head);
+    var card = el('section.quest-card' + (failed ? '.failed' : complete ? '.complete' : '') + (open ? '.open' : ''), {}, head);
 
-    if (q.nextResetAt) {
-      card.appendChild(el('div.reset-banner', {},
-        'Resets ' + fmtUntil(q.nextResetAt) +
-        (complete ? ' — done for this period.' : prog.total ? ' — ' + (prog.total - prog.done) + ' left.' : '')));
+    if (failed) {
+      card.appendChild(el('div.deadline-banner.danger', {},
+        'Failed' + (q.failedAt ? ' ' + fmtDate(q.failedAt) : '') + ' — streak broken. Reopen to keep using it.'));
+    } else {
+      if (q.nextResetAt) {
+        card.appendChild(el('div.reset-banner', {},
+          'Resets ' + fmtUntil(q.nextResetAt) +
+          (complete ? ' — done for this period.' : prog.total ? ' — ' + (prog.total - prog.done) + ' left.' : '')));
+      }
+      /* One-off deadline banner: upcoming → warn near due → danger when overdue. */
+      if (q.cadence === 'oneoff' && q.dueAt && !complete) {
+        var ds = Engine.deadlineState(q);
+        if (ds.state === 'overdue') {
+          card.appendChild(el('div.deadline-banner.danger', {},
+            'Overdue ' + fmtDate(q.dueAt) + (q.penaltyEnabled ? ' — taking damage.' : ' — past due.')));
+        } else if (ds.state === 'due-soon') {
+          card.appendChild(el('div.deadline-banner.warn', {}, 'Due ' + fmtUntil(q.dueAt) + '.'));
+        } else if (ds.state === 'upcoming') {
+          card.appendChild(el('div.deadline-banner', {}, 'Due ' + fmtUntil(q.dueAt) + '.'));
+        }
+      }
     }
 
     if (open) {
@@ -133,6 +170,9 @@ window.ViewQuests = (function () {
         q.status === 'archived'
           ? el('button.btn.tiny.ghost', { onclick: function () { setArchived(q, false); } }, 'Restore')
           : el('button.btn.tiny.ghost', { onclick: function () { setArchived(q, true); } }, 'Archive'),
+        failed
+          ? el('button.btn.tiny.ghost', { onclick: function () { reopenQuest(q); } }, 'Reopen')
+          : el('button.btn.tiny.danger', { onclick: function () { failQuestConfirm(q); } }, 'Fail'),
         el('button.btn.tiny.danger', { onclick: function () { deleteQuest(q); } }, 'Delete')));
     }
 
@@ -333,6 +373,23 @@ window.ViewQuests = (function () {
       });
   }
 
+  /* Mark a quest failed outright. Always breaks the streak; if this quest has
+   * damage penalties on, giving up also costs a base hit and a neglect debuff. */
+  function failQuestConfirm(q) {
+    var warn = q.penaltyEnabled
+      ? 'The streak breaks, you take ' + Engine.baseStepDamage(q) + ' damage, and you pick up a neglect debuff.'
+      : 'The streak breaks. (No damage — this quest has penalties turned off.)';
+    confirmModal('Fail this quest?',
+      '"' + q.title + '" will be marked failed. ' + warn + ' You can reopen it afterward, but the streak and any damage stay.',
+      function () {
+        Progress.failQuest(q).then(function () { App.render(); });
+      }, 'Fail it');
+  }
+
+  function reopenQuest(q) {
+    Progress.reopenFailedQuest(q).then(function () { App.render(); });
+  }
+
   function deleteTask(q, t) {
     /* Removing a completed task claws back the XP it paid, otherwise deleting
      * finished tasks would be a free XP faucet. */
@@ -387,6 +444,65 @@ window.ViewQuests = (function () {
 
     var iconCtl = Icons.iconField(draft.iconSlug, function (slug) { draft.iconSlug = slug; });
 
+    /* ---- Failure, deadline & damage ---- */
+    var pen = (q && q.penalty) || {};
+    var penaltyOn = el('input', { type: 'checkbox', checked: !!(q && q.penaltyEnabled) });
+
+    var dueInput = el('input.input', { type: 'datetime-local', value: dtLocal(q && q.dueAt) });
+    var dueWrap = field('Deadline', dueInput, 'Past this, the quest goes overdue and starts taking damage.');
+
+    var ndSel = selectInput(
+      [{ value: 'auto', label: 'Auto — themed to this quest' }, { value: 'none', label: 'None' }]
+        .concat(CONFIG.neglectDebuffs.order.map(function (k) {
+          var e = CONFIG.neglectDebuffs.catalog[k];
+          return { value: k, label: e.name + ' (−1 ' + e.stat + ')' };
+        })), pen.neglectDebuff || 'auto');
+
+    var rampSel = selectInput([
+      { value: 'linear', label: 'Escalating — worse each step' },
+      { value: 'flat', label: 'Flat — same each step' }
+    ], pen.ramp || CONFIG.penaltyDefaults.ramp);
+
+    var maxStepsInput = numInput(pen.maxSteps || CONFIG.penaltyDefaults.maxSteps, 1);
+    var autoFailInput = numInput(pen.autoFailSteps || '', 0);
+    var dmgOverrideInput = numInput(pen.damagePerStep || '', 0);
+
+    var dmgHint = el('span.field-hint', {});
+    function refreshHint() {
+      var w = (parseInt(bonus.value, 10) || 0) +
+        (((q && q.tasks) || []).reduce(function (s, t) { return s + (t.xpReward || 0); }, 0));
+      var ov = parseInt(dmgOverrideInput.value, 10) || 0;
+      var d0 = ov > 0 ? ov : Math.max(CONFIG.penaltyMinDamage, Math.round(w * CONFIG.penaltyDamagePerXp));
+      dmgHint.textContent = 'Bleeds ~' + d0 + ' HP on the first overdue step' +
+        (rampSel.value === 'linear' ? ', then ~' + (d0 * 2) + ', ~' + (d0 * 3) + '…' : ', each step') + '.';
+    }
+    bonus.addEventListener('input', refreshHint);
+    dmgOverrideInput.addEventListener('input', refreshHint);
+    rampSel.addEventListener('change', refreshHint);
+
+    var advanced = el('div.penalty-advanced', {},
+      field('Neglect debuff', ndSel, 'A temporary −1 that lifts when you finish the quest.'),
+      el('div.form-row', {},
+        field('Damage per step', dmgOverrideInput, 'Blank = scale from the quest’s XP.'),
+        field('Escalation', rampSel)),
+      el('div.form-row', {},
+        field('Max steps', maxStepsInput, 'Damage stops growing after this many.'),
+        field('Auto-fail after', autoFailInput, 'Steps overdue before it hard-fails. Blank = never.')),
+      el('div.field', {}, dmgHint));
+
+    var penaltyWrap = el('div.penalty-block', {},
+      el('label.switch-row', {}, penaltyOn, el('span', {}, 'Take damage when neglected')),
+      el('span.field-hint', {}, 'The streak always breaks on a miss; this adds escalating health damage (and death at 0 HP).'),
+      advanced);
+
+    function syncPenalty() {
+      dueWrap.style.display = cadence.value === 'oneoff' ? '' : 'none';
+      advanced.style.display = penaltyOn.checked ? '' : 'none';
+      refreshHint();
+    }
+    penaltyOn.addEventListener('change', syncPenalty);
+    cadence.addEventListener('change', syncPenalty);
+
     var share = shareControls(q);
 
     var body = el('div', {},
@@ -395,6 +511,8 @@ window.ViewQuests = (function () {
       el('div.form-row', {}, field('Icon', iconCtl), field('Bonus XP', bonus, 'Paid when every task is done.')),
       field('Cadence', cadence, 'All tasks in the quest reset together on this rhythm.'),
       weekWrap, monthWrap,
+      dueWrap,
+      penaltyWrap,
       share.node);
 
     openModal({
@@ -416,6 +534,19 @@ window.ViewQuests = (function () {
               resetDayOfMonth: Math.max(1, Math.min(31, parseInt(domSel.value, 10) || 1))
             };
             patch.nextResetAt = Engine.nextResetAt(cad, Date.now(), patch);
+
+            patch.penaltyEnabled = penaltyOn.checked;
+            patch.dueAt = (cad === 'oneoff' && dueInput.value) ? new Date(dueInput.value).getTime() : null;
+            patch.penalty = {
+              neglectDebuff: ndSel.value,
+              ramp: rampSel.value,
+              maxSteps: Math.max(1, parseInt(maxStepsInput.value, 10) || CONFIG.penaltyDefaults.maxSteps),
+              autoFailSteps: (parseInt(autoFailInput.value, 10) || 0) || null,
+              damagePerStep: (parseInt(dmgOverrideInput.value, 10) || 0) || null
+            };
+            /* A new or changed deadline re-arms the overdue tally so it bills fresh. */
+            if (!q || q.dueAt !== patch.dueAt) patch.penaltyStepsCharged = 0;
+
             share.apply(patch, q);
 
             var op = isNew ? Store.addQuest(patch) : Store.updateQuest(q.id, patch);
@@ -430,6 +561,7 @@ window.ViewQuests = (function () {
     });
 
     syncCadence();
+    syncPenalty();
   }
 
   /* Sharing controls, only meaningful in a cloud party. When you're not in one,

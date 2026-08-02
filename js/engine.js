@@ -314,6 +314,85 @@ window.Engine = (function () {
     return CONFIG.streakMilestones.indexOf(streak) !== -1;
   }
 
+  /* ---- Quest failure, deadlines & damage --------------------------------- */
+
+  /* A quest's "worth" — its bonus plus all its task XP. Serious quests pay more,
+   * so failure damage (which scales off this) also hurts more. */
+  function questXpWeight(quest) {
+    var bonus = quest && quest.bonusXp !== undefined ? quest.bonusXp : CONFIG.questBonusXpDefault;
+    var taskXp = ((quest && quest.tasks) || []).reduce(function (s, t) { return s + (t.xpReward || 0); }, 0);
+    return Math.max(0, (bonus || 0) + taskXp);
+  }
+
+  /* A penalty option, falling back to the CONFIG default when the quest doesn't
+   * override it. */
+  function penaltyOpt(quest, key) {
+    var p = (quest && quest.penalty) || {};
+    return (p[key] !== undefined && p[key] !== null) ? p[key] : CONFIG.penaltyDefaults[key];
+  }
+
+  /* Damage for the first overdue step, before the ramp. A per-quest
+   * damagePerStep overrides the XP-derived value. */
+  function baseStepDamage(quest) {
+    var override = quest && quest.penalty && quest.penalty.damagePerStep;
+    if (typeof override === 'number' && override > 0) return Math.round(override);
+    return Math.max(CONFIG.penaltyMinDamage, Math.round(questXpWeight(quest) * CONFIG.penaltyDamagePerXp));
+  }
+
+  /* Total damage across steps (fromStep, toStep], steps 1-indexed. Linear ramp
+   * charges D0*n for step n (neglect compounds); flat charges D0 each. */
+  function damageForSteps(quest, fromStep, toStep) {
+    var d0 = baseStepDamage(quest);
+    var ramp = penaltyOpt(quest, 'ramp');
+    var total = 0;
+    for (var n = Math.max(0, fromStep) + 1; n <= toStep; n++) {
+      total += ramp === 'flat' ? d0 : d0 * n;
+    }
+    return total;
+  }
+
+  /* How many escalation steps a DATED (one-off) quest is overdue, and where the
+   * next step lands. A step is `stepDays` past dueAt; capped at maxSteps.
+   * Recurring quests fail on period rollover instead (Progress.runResets), so
+   * they return 0 here. */
+  function overdueSteps(quest, now) {
+    now = now || Date.now();
+    if (!quest || quest.cadence !== 'oneoff' || !quest.dueAt) return { steps: 0, nextStepAt: (quest && quest.dueAt) || null };
+    if (quest.status === 'failed' || quest.status === 'archived') return { steps: 0, nextStepAt: null };
+    if (questProgress(quest.tasks).complete) return { steps: 0, nextStepAt: null };
+    if (quest.dueAt > now) return { steps: 0, nextStepAt: quest.dueAt };
+    var stepMs = Math.max(1, penaltyOpt(quest, 'stepDays')) * 86400000;
+    var raw = Math.floor((now - quest.dueAt) / stepMs) + 1;   /* 1 the instant it comes due */
+    return { steps: Math.min(raw, penaltyOpt(quest, 'maxSteps')), nextStepAt: quest.dueAt + raw * stepMs };
+  }
+
+  /* UI helper: what the deadline banner should say for a quest carrying a dueAt.
+   * 'none' | 'upcoming' | 'due-soon' (<24h) | 'overdue' | 'failed'. */
+  function deadlineState(quest, now) {
+    now = now || Date.now();
+    if (quest.status === 'failed') return { state: 'failed' };
+    if (!quest.dueAt || questProgress(quest.tasks).complete) return { state: 'none' };
+    if (quest.dueAt > now) {
+      return { state: (quest.dueAt - now) <= 86400000 ? 'due-soon' : 'upcoming', dueAt: quest.dueAt };
+    }
+    return { state: 'overdue', steps: overdueSteps(quest, now).steps, dueAt: quest.dueAt };
+  }
+
+  /* Resolve which neglect debuff a quest inflicts: an explicit catalog key, or a
+   * stable deterministic pick off the quest id when set to 'auto'. Returns the
+   * catalog entry (plus its key), or null for 'none'. No Math.random — the pick
+   * must be identical every load for the same quest. */
+  function resolveNeglectDebuff(quest) {
+    var choice = (quest && quest.penalty && quest.penalty.neglectDebuff) || 'auto';
+    if (choice === 'none') return null;
+    var cat = CONFIG.neglectDebuffs.catalog, order = CONFIG.neglectDebuffs.order;
+    if (choice !== 'auto' && cat[choice]) return Object.assign({ key: choice }, cat[choice]);
+    var id = String((quest && quest.id) || 'quest'), h = 0;
+    for (var i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+    var key = order[h % order.length];
+    return Object.assign({ key: key }, cat[key]);
+  }
+
   /* ---- Point-buy (races & classes) --------------------------------------- */
 
   /* Budget = base (x1.5 if the chosen class is Earth-gated) plus whatever the
@@ -357,6 +436,12 @@ window.Engine = (function () {
     needsReset: needsReset,
     questProgress: questProgress,
     isStreakMilestone: isStreakMilestone,
+    questXpWeight: questXpWeight,
+    baseStepDamage: baseStepDamage,
+    damageForSteps: damageForSteps,
+    overdueSteps: overdueSteps,
+    deadlineState: deadlineState,
+    resolveNeglectDebuff: resolveNeglectDebuff,
     buildBudget: buildBudget
   };
 })();

@@ -131,8 +131,9 @@ window.App = (function () {
          * or undo entry. Run them after we're already in and repaint if they
          * changed anything. */
         Progress.runResets()
+          .then(function () { return Progress.runDeadlines(); })
           .then(function () { if (stage === 'app') safeRender(); })
-          .catch(function (e) { console.warn('[qm] resets failed (continuing)', e); });
+          .catch(function (e) { console.warn('[qm] resets/deadlines failed (continuing)', e); });
       })
       .catch(function (e) {
         console.error('[qm] could not read character document', e);

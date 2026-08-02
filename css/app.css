@@ -1012,3 +1012,38 @@ select.input { appearance: none; background-image: linear-gradient(45deg, transp
 .wc-kind { font-weight: 700; color: var(--wc); font-size: .74rem; text-transform: uppercase; letter-spacing: .03em; }
 .wc-item-title { font-weight: 600; font-size: .9rem; }
 .wc-item-text { font-size: .86rem; color: var(--ink-2); margin-top: 3px; white-space: pre-wrap; word-break: break-word; }
+
+/* ---- Quest failure, deadlines & penalties (M8) --------------------------------- */
+
+/* Deadline / overdue banner, sibling to .reset-banner. Neutral by default,
+ * gold when due soon, red when overdue or failed. */
+.deadline-banner {
+  font-family: var(--mono); font-size: .68rem; color: var(--ink-3);
+  padding: 5px var(--pad); background: var(--bg-2); border-top: 1px solid var(--line);
+}
+.deadline-banner.warn { color: var(--accent-2); background: rgba(212, 160, 39, .10); }
+.deadline-banner.danger { color: #f0b7b2; background: rgba(192, 85, 77, .14); }
+
+/* A failed quest reads as spent: dimmed, red-edged, with an ✗ where the ✓ goes. */
+.quest-card.failed { opacity: .78; border-color: rgba(192, 85, 77, .5); }
+.quest-card.failed .quest-title { color: var(--ink-2); text-decoration: line-through; }
+.failed-chip { color: var(--bad); font-size: 1.05rem; font-weight: 700; }
+
+/* The little skull on a quest that bites back when neglected. */
+.penalty-badge { font-size: .72rem; color: var(--bad); opacity: .85; }
+
+/* Editor: the damage switch and its collapsible advanced block. */
+.penalty-block {
+  margin-top: 12px; padding: 12px; border: 1px solid var(--line);
+  border-radius: var(--r); background: var(--bg-2);
+}
+.switch-row { display: flex; align-items: center; gap: 9px; font-weight: 600; font-size: .9rem; cursor: pointer; }
+.switch-row input { width: 16px; height: 16px; }
+.penalty-advanced { margin-top: 10px; }
+
+/* Fanfare with an icon (death). */
+.fanfare.has-icon { padding-top: 10px; }
+.fanfare-icon { display: flex; justify-content: center; margin-bottom: 6px; }
+.fanfare-icon svg { width: 46px; height: 46px; fill: var(--accent-2); }
+.death-mark { display: flex; justify-content: center; margin-bottom: 8px; }
+.death-mark svg { width: 64px; height: 64px; fill: var(--bad); }

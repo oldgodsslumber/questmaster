@@ -6,7 +6,7 @@
  */
 window.CONFIG = {
 
-  build: '20260727w',
+  build: '20260729w',
 
   /* ---- Admin ----------------------------------------------------------- */
 
@@ -101,6 +101,65 @@ window.CONFIG = {
   /* Co-op bonus split. Unused until M5 (party layer) but the number lives here
    * so the split is a config change, not a code change. 1.0 = winner takes all. */
   coopBonusTopShare: 0.7,
+
+  /* ---- Quest failure & penalties --------------------------------------- */
+
+  /* A quest can carry a soft deadline (dueAt). Past it, an unfinished quest goes
+   * OVERDUE and — if damage is enabled — bleeds health one step at a time. A step
+   * is a day late (one-off) or a missed period (recurring). Base damage scales
+   * with the quest's XP weight (bonusXp + task XP) so serious quests hurt more,
+   * and ramps with how long it's been neglected. The streak break happens on any
+   * miss regardless; damage and neglect debuffs are opt-in per quest. */
+  penaltyDamagePerXp: 0.1,     // base damage/step = round(questXpWeight * this)…
+  penaltyMinDamage: 2,         // …but never less than this per step
+  penaltyDefaults: {
+    ramp: 'linear',            // 'linear' (step n costs n×) | 'flat'
+    stepDays: 1,               // one-off: real days late per escalation step
+    maxSteps: 7,               // cap on charged steps, so neglect can't spiral forever
+    autoFailSteps: null        // null = never auto-fail; N = hard-fail after N overdue steps
+  },
+
+  /* Curated "consequences of neglect" debuffs — flavor, not personal baggage.
+   * Each is a fixed −1 to one attribute with a matching game-icon. They ride the
+   * statuses system (which flips +N to −N for a debuff automatically) and expire
+   * on their own; finishing the quest clears its debuff early. A quest's
+   * penalty.neglectDebuff is 'auto' (deterministic pick), one of these keys, or
+   * 'none'. */
+  neglectDebuffDurationH: 48,
+  neglectDebuffs: {
+    order: ['derelict', 'forgetful', 'sluggish', 'rusty', 'rundown'],
+    catalog: {
+      derelict:  { name: 'Derelict',  iconSlug: 'lorc/cobweb',      stat: 'CHA', desc: "You've let everything gather dust. It shows." },
+      forgetful: { name: 'Forgetful', iconSlug: 'lorc/brain',       stat: 'INT', desc: 'Tasks keep slipping your mind.' },
+      sluggish:  { name: 'Sluggish',  iconSlug: 'lorc/snail',       stat: 'DEX', desc: 'All momentum, lost.' },
+      rusty:     { name: 'Rusty',     iconSlug: 'lorc/broken-bone', stat: 'STR', desc: 'Out of practice, out of shape.' },
+      rundown:   { name: 'Run-Down',  iconSlug: 'lorc/despair',     stat: 'CON', desc: 'Neglect wears on you.' }
+    }
+  },
+
+  /* ---- Death ----------------------------------------------------------- */
+
+  /* Death fires when penalty damage takes currentHealth to 0. It is a SOFT reset,
+   * not a wipe: you KEEP attributes, skills, quests, journal, statuses, traits and
+   * achievements (what you invested effort into) and LOSE level, XP, unspent
+   * points, items and equipment (the in-game spoils). See Progress.die(). */
+  deathIconSlug: 'delapouite/grave-flowers',
+  deathFanfareLines: [
+    'Level 1 again. At least the routine survived.',
+    'The System reboots your corpse. Your pack is empty.',
+    'Death is temporary. The to-do list is forever.'
+  ],
+  deathAchievementLines: [
+    'Turned to XP paste by an overdue quest.',
+    'Slain by a to-do list. The AI is delighted.',
+    'Cause of death: procrastination, high-value quest.',
+    'Died as they lived — three days behind.',
+    'Neglected one quest too many. Splat.'
+  ],
+  /* Optional insurance: stash the lost collections under the character doc before
+   * a death wipes them, so an admin restore is possible. Off by default — death
+   * is meant to sting. */
+  deathBackup: false,
 
   /* ---- Races & Classes point-buy ---------------------------------------- */
 

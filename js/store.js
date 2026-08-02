@@ -299,7 +299,16 @@ window.Store = (function () {
       streak: 0,
       bestStreak: 0,
       completedThisPeriod: false,
-      lastCompletedAt: null
+      lastCompletedAt: null,
+      /* Failure & deadlines. penaltyEnabled gates DAMAGE (the streak break happens
+       * on any miss regardless); dueAt is the soft threshold. All optional — a
+       * quest left at defaults behaves exactly as before this feature. */
+      penaltyEnabled: false,
+      dueAt: null,
+      penalty: null,
+      penaltyStepsCharged: 0,
+      failedAt: null,
+      failCount: 0
     }, data);
     return backend.addDoc(base().concat('quests'), doc).then(function (id) {
       var full = Object.assign({ id: id, tasks: [] }, doc);

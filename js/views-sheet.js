@@ -80,7 +80,10 @@ window.ViewSheet = (function () {
    * spell restores *slots*, so the sheet draws slots and edits in slot units. */
   function resources(c, d) {
     var r = c.resources || {};
-    var cur = Math.min(r.currentHealth || 0, d.maxHealth);
+    /* An untouched crawler is at FULL health, not zero — otherwise the very first
+     * neglect-damage would read as a killing blow. Damage (Progress.applyDamage)
+     * uses the same "unset means full" rule, so the two always agree. */
+    var cur = Math.min(r.currentHealth == null ? d.maxHealth : r.currentHealth, d.maxHealth);
     var slots = Engine.healthSlots(cur, d.slotCapacity);
 
     var slotRow = el('div.hp-slots', {}, slots.map(function (slot) {
